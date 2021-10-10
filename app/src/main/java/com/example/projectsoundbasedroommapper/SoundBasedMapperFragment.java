@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -16,6 +18,7 @@ import android.media.AudioRecord;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.media.ToneGenerator;
+import android.os.AsyncTask;
 import android.os.Bundle;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -26,6 +29,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import android.os.Handler;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -34,6 +38,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.projectsoundbasedroommapper.classes.Complex;
 import com.example.projectsoundbasedroommapper.classes.RoomView;
 import com.example.projectsoundbasedroommapper.classes.SoundGraphView;
 import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
@@ -74,6 +79,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private RealDoubleFFT fft;
     private AudioRecord audioRecord;
 
+    //nytt
+//    private RealDoubleFFT transformer;
+//    int frequency = 8000;
+//    int channelConfiguration = AudioFormat.CHANNEL_CONFIGURATION_MONO; int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
+//    ImageView imageView; Bitmap bitmap; Canvas canvas; Paint paint;
+//    boolean started = true;
+    //RecordAudio recordTask;
 
     public SoundBasedMapperFragment() {
         // Required empty public constructor
@@ -161,6 +173,35 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 }
             }
         });
+
+        //nytt
+//        transformer = new RealDoubleFFT(blockSize);
+//        imageView = (ImageView) requireActivity().findViewById(R.id.ivGraph);
+//        bitmap = Bitmap.createBitmap((int)256,(int)100,Bitmap.Config.ARGB_8888);
+//        canvas = new Canvas(bitmap);
+//        paint = new Paint();
+//        paint.setColor(Color.GREEN);
+//        imageView.setImageBitmap(bitmap);
+//
+//        int channel_config = AudioFormat.CHANNEL_CONFIGURATION_MONO;
+//        int format = AudioFormat.ENCODING_PCM_16BIT;
+//        int sampleSize = 8000;
+//        int bufferSize = AudioRecord.getMinBufferSize(sampleSize, channel_config, format);
+//        @SuppressLint("MissingPermission")
+//        AudioRecord audioInput = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleSize, channel_config, format, bufferSize);
+//
+//        short[] audioBuffer = new short[bufferSize];
+//        audioInput.startRecording();
+//        audioInput.read(audioBuffer, 0, bufferSize);
+//
+//        Complex[] fftTempArray = new Complex[bufferSize];
+//        for (int i=0; i<bufferSize; i++)
+//        {
+//            double[] audio;
+//
+//            fftTempArray[i] = new Complex(audio[i], 0);
+//        }
+//        Complex[] fftArray = fft(fftTempArray);
     }
 
     public boolean checkMicAvailability(){
@@ -285,10 +326,101 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         });
     }
 
+    //nytt---------------------------------------------------------------------------------------------------------
+    /*
+    @SuppressLint({"MissingPermission", "StaticFieldLeak"})
+    private class RecordAudio extends AsyncTask<Void, double[], Void> {
+        @Override
+        protected Void doInBackground(Void... params) {
+            try {
+                int bufferSize = AudioRecord.getMinBufferSize(frequency, channelConfiguration, audioEncoding);
+                AudioRecord audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, frequency, channelConfiguration, audioEncoding, bufferSize);
+                short[] buffer = new short[blockSize]; double[] toTransform = new double[blockSize];
 
+                audioRecord.startRecording();
+                while (started) {
+                    int bufferReadResult = audioRecord.read(buffer, 0, blockSize);
+
+                    for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
+                        toTransform[i] = (double) buffer[i];
+                    }
+                    transformer.ft(toTransform);
+                    publishProgress(toTransform);
+                    Log.e("AudioRecord", "Recording Failed");
+                    return null;
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        protected void onProgressUpdate(double[]... toTransform) {
+            canvas.drawColor(Color.BLACK);
+            for (int i = 0; i < toTransform[0].length; i++) {
+                int x = i;
+                int downy = (int) (100 - (toTransform[0][i] * 10));
+                int upy = 100;
+
+                canvas.drawLine(x, downy, x, upy, paint);
+
+                imageView.invalidate();
+            }
+        }
+
+        public void onClick(View v) {
+            if (started) {
+                started = false;
+                btSoundPlayer.setText("Start");
+                recordTask.cancel(true);
+            } else {
+                started = true;
+                btSoundPlayer.setText("Stop");
+                recordTask = new RecordAudio();
+                recordTask.execute();
+            }
+        }
+    }*/
+//    protected void onProgressUpdate(double[]... toTransform) {
+//        canvas.drawColor(Color.BLACK);
+//        for (int i = 0; i < toTransform[0].length; i++) {
+//            int x = i;
+//            int downy = (int) (100 - (toTransform[0][i] * 10));
+//            int upy = 100;
+//
+//            canvas.drawLine(x, downy, x, upy, paint);
+//
+//            imageView.invalidate();
+//        }
+//    }
+    //slutt-------------------------------------------------------------------------------------------------------------------------
 
     @SuppressLint("MissingPermission")
     private void recordSound(){
+        //nytt Halil.
+        //https://stackoverflow.com/questions/5774104/android-audio-fft-to-retrieve-specific-frequency-magnitude-using-audiorecord
+//        try {
+//            int bufferSize = AudioRecord.getMinBufferSize(frequency, channelConfiguration, audioEncoding);
+//            AudioRecord audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, frequency, channelConfiguration, audioEncoding, bufferSize);
+//            short[] buffer = new short[blockSize]; double[] toTransform = new double[blockSize];
+//
+//            audioRecord.startRecording();
+//            while (started) {
+//                int bufferReadResult = audioRecord.read(buffer, 0, blockSize);
+//
+//                for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
+//                    toTransform[i] = (double) buffer[i];
+//                }
+//                transformer.ft(toTransform);
+//                onProgressUpdate(toTransform);
+//                //Log.e("AudioRecord", "Recording Failed");
+//            }
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+
         /*int bufferSize = AudioRecord.getMinBufferSize(12000, AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT);
         audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, 12000,
                 AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
@@ -310,6 +442,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             //fft.ft(toTransform);
         }*/
 
+
         recorder = new MediaRecorder();
         recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
@@ -322,6 +455,8 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             Toast.makeText(requireContext(),"Recorder prepare failed.", Toast.LENGTH_SHORT).show();
         }
         recorder.start();
+
+
     }
 
     private void playRecorded(){
@@ -329,10 +464,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         try{
             recordedMediaPlayer.setDataSource(fileName);
             recordedMediaPlayer.prepare();
-            recordedMediaPlayer.start();
         } catch (IOException e) {
             Toast.makeText(requireContext(), "Mediaplayer has failed.", Toast.LENGTH_SHORT).show();
         }
+
+        recordedMediaPlayer.start();
     }
 
     private void stopRecording(){

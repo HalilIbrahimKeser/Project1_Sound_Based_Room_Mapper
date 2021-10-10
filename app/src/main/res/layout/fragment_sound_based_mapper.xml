@@ -65,9 +65,8 @@
         <ImageView
             android:id="@+id/ivGraph"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:background="@color/white">
-        </ImageView>
+            android:layout_height="144dp"
+            android:background="@color/white"></ImageView>
 
         <Button
             android:id="@+id/playSound"
