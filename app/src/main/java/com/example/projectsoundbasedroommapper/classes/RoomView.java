@@ -23,6 +23,9 @@ public class RoomView extends View {
     private ArrayList<XZCoordinates> objectCoordinates;
 
 
+    private float x_value;
+    private float z_value;
+
 
     public RoomView(Context context) {
         super(context);
@@ -60,6 +63,10 @@ public class RoomView extends View {
     @Override
     public void draw(Canvas canvas) {
         super.draw(canvas);
+        //TODO
+        if (z_value != 0.0 && x_value != 0.0){
+            //draw position of object
+        }
 
         float my_x_pos = canvas.getWidth()/2;
         float my_z_pos = canvas.getHeight()/2;
@@ -69,4 +76,21 @@ public class RoomView extends View {
         canvas.drawRect(20, 100, canvas.getWidth()-30, canvas.getHeight()-100, paintBox);
 
     }
+
+    public float getX_value() {
+        return x_value;
+    }
+
+    public void setX_value(float x_value) {
+        this.x_value = x_value;
+    }
+
+    public float getZ_value() {
+        return z_value;
+    }
+
+    public void setZ_value(float z_value) {
+        this.z_value = z_value;
+    }
+
 }

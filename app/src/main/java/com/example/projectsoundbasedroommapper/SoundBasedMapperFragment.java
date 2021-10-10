@@ -121,7 +121,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         super.onViewCreated(view, savedInstanceState);
         btSoundPlayer = view.findViewById(R.id.playSound);
 
-        fileName = requireContext().getExternalCacheDir().getAbsolutePath();
+        fileName = requireContext().getFilesDir().getAbsolutePath();
         fileName += "/audiorecordtest.3gp";
 
         boolean hasMic = checkMicAvailability();
@@ -307,7 +307,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             for (int i = 0; i < blockSize && i < bufferReadResult; i++){
                 toTransform[i] = (double) buffer[i] / 32768.0;
             }
-            fft.ft(toTransform);
+            //fft.ft(toTransform);
         }*/
 
         recorder = new MediaRecorder();
