@@ -1,6 +1,7 @@
 package com.example.projectsoundbasedroommapper;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -9,7 +10,9 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioFormat;
 import android.media.AudioManager;
+import android.media.AudioRecord;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.media.ToneGenerator;
@@ -22,6 +25,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -32,6 +36,7 @@ import android.widget.Toast;
 
 import com.example.projectsoundbasedroommapper.classes.RoomView;
 import com.example.projectsoundbasedroommapper.classes.SoundGraphView;
+import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
 
 import java.io.IOException;
 import java.util.Timer;
@@ -64,6 +69,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private static String fileName = null;
     private MediaPlayer recordedMediaPlayer;
     private ToneGenerator tone;
+
+    private int blockSize = 256; //for fft
+    private RealDoubleFFT fft;
+    private AudioRecord audioRecord;
 
 
     public SoundBasedMapperFragment() {
@@ -148,7 +157,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         playSound();
                     }
                 } else{
-                    stopProgram();
+                    //stopProgram();
                 }
             }
         });
@@ -230,11 +239,19 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         btSoundPlayer.setText("Stop");
         playSound();
         recordSound();
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                // Do something after 5s = 5000ms
+                stopProgram();
+            }
+        }, 5000);
     }
 
     private void stopProgram(){
-        isRunning = false;
-        btSoundPlayer.setText("Play");
+        //isRunning = false;
+        //btSoundPlayer.setText("Play");
         stopRecording();
         stopSound();
 
@@ -247,17 +264,22 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
 
         tone= new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
-        tone.startTone(ToneGenerator.TONE_DTMF_1);
+        tone.startTone(ToneGenerator.TONE_SUP_PIP);
+
     }
 
     private void stopSound(){
         tone.stopTone();
+        tone.release();
+        tone = null;
         playRecorded();
         recordedMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mediaPlayer) {
                 recordedMediaPlayer.release();
                 recordedMediaPlayer = null;
+                isRunning = false;
+                btSoundPlayer.setText("Play");
                 Toast.makeText(requireContext(), "Completed playing recorded", Toast.LENGTH_SHORT).show();
             }
         });
@@ -265,7 +287,29 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
 
 
+    @SuppressLint("MissingPermission")
     private void recordSound(){
+        /*int bufferSize = AudioRecord.getMinBufferSize(12000, AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, 12000,
+                AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+
+        int bufferReadResult;
+        short[] buffer = new short[blockSize];
+        double[] toTransform = new double[blockSize];
+        try {
+            audioRecord.startRecording();
+            Toast.makeText(requireContext(), "Start recording", Toast.LENGTH_SHORT).show();
+        } catch (IllegalStateException e) {
+            Toast.makeText(requireContext(), e.toString(), Toast.LENGTH_SHORT).show();
+        }
+        while (isRunning){
+            bufferReadResult = audioRecord.read(buffer, 0, blockSize);
+            for (int i = 0; i < blockSize && i < bufferReadResult; i++){
+                toTransform[i] = (double) buffer[i] / 32768.0;
+            }
+            fft.ft(toTransform);
+        }*/
+
         recorder = new MediaRecorder();
         recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
