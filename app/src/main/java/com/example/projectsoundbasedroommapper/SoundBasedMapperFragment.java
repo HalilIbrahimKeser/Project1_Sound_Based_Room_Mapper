@@ -16,16 +16,19 @@ import android.media.AudioRecord;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.media.ToneGenerator;
+import android.os.AsyncTask;
 import android.os.Bundle;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import android.os.Handler;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -73,6 +76,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private int blockSize = 256; //for fft
     private RealDoubleFFT fft;
     private AudioRecord audioRecord;
+    int frequency = 8000;
+    int channelConfiguration = AudioFormat.CHANNEL_IN_MONO;
+    int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
+    private RecordAudio recordTask;
 
 
     public SoundBasedMapperFragment() {
@@ -107,11 +114,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     public void onResume() {
         super.onResume();
         accelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        if(accelerometer!=null){
+        if (accelerometer != null) {
             mSensorManager.registerListener(this, accelerometer, mSensorManager.SENSOR_DELAY_NORMAL);
         }
         magneticField = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        if(magneticField != null){
+        if (magneticField != null) {
             mSensorManager.registerListener(this, magneticField, mSensorManager.SENSOR_DELAY_NORMAL);
         }
     }
@@ -121,11 +128,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         super.onViewCreated(view, savedInstanceState);
         btSoundPlayer = view.findViewById(R.id.playSound);
 
+        fft = new RealDoubleFFT(blockSize);
+
         fileName = requireContext().getFilesDir().getAbsolutePath();
         fileName += "/audiorecordtest.3gp";
 
         boolean hasMic = checkMicAvailability();
-        mSensorManager = (SensorManager)getActivity().getSystemService(Context.SENSOR_SERVICE);
+        mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
         tvOrientationAngles = view.findViewById(R.id.tvOrientationAngles);
         tvRotationMatrix = view.findViewById(R.id.tvRotationMatrix);
 
@@ -146,24 +155,24 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         btSoundPlayer.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (!isRunning){
-                    if (hasMic){
+                if (!isRunning) {
+                    if (hasMic) {
                         //ask for recording permissions
                         askForRecordingPermission();
-                    } else{
+                    } else {
                         Toast.makeText(requireActivity(),
                                 "This feature will only play a sound without a microphone. Please enjoy this tone.",
                                 Toast.LENGTH_SHORT).show();
                         playSound();
                     }
-                } else{
-                    //stopProgram();
+                } else {
+                    stopProgram();
                 }
             }
         });
     }
 
-    public boolean checkMicAvailability(){
+    public boolean checkMicAvailability() {
         if (requireActivity().getApplicationContext().getPackageManager().hasSystemFeature(
                 PackageManager.FEATURE_MICROPHONE)) {
             return true;
@@ -172,7 +181,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
     }
 
-    public void askForRecordingPermission (){
+    public void askForRecordingPermission() {
         if (ContextCompat.checkSelfPermission(
                 requireContext(), Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED) {
@@ -194,85 +203,61 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     }
 
     private ActivityResultLauncher<String> requestPermissionLauncher =
-        registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-            if (isGranted) {
-                // Permission is granted. Continue the action or workflow in your
-                // app.
-                startProgram();
-            } else {
-                // Explain to the user that the feature is unavailable because the
-                // features requires a permission that the user has denied. At the
-                // same time, respect the user's decision. Don't link to system
-                // settings in an effort to convince the user to change their
-                // decision.
-                Toast.makeText(requireActivity(), "This button will only play a sound.", Toast.LENGTH_SHORT).show();
-            }
-        });
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+                if (isGranted) {
+                    // Permission is granted. Continue the action or workflow in your
+                    // app.
+                    startProgram();
+                } else {
+                    // Explain to the user that the feature is unavailable because the
+                    // features requires a permission that the user has denied. At the
+                    // same time, respect the user's decision. Don't link to system
+                    // settings in an effort to convince the user to change their
+                    // decision.
+                    Toast.makeText(requireActivity(), "This button will only play a sound.", Toast.LENGTH_SHORT).show();
+                }
+            });
 
-    /*public AudioTrack generateTone(double freqHz, int durationMs){
-        int count = (int)(44100.0 * 2.0 * (durationMs / 1000.0)) & ~1;
-        short[] samples = new short[count];
-        for(int i = 0; i < count; i += 10){
-            short sample = (short)(Math.sin(2 * Math.PI * i / (44100.0 / freqHz)) * 0x7FFF);
-            samples[i + 0] = sample;
-            samples[i + 1] = sample;
-        }
-        AudioTrack track = new AudioTrack.Builder()
-                .setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build())
-                .setAudioFormat(new AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(44100)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                    .build())
-                .setBufferSizeInBytes(AudioTrack.getMinBufferSize(44100, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT))
-                .build();
-        track.write(samples, 0, count);
-
-        return track;
-    }*/
-
-    private void startProgram(){
+    private void startProgram() {
         isRunning = true;
         btSoundPlayer.setText("Stop");
-        playSound();
         recordSound();
-        Handler handler = new Handler();
+        playSound();
+        /*Handler handler = new Handler();
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 // Do something after 5s = 5000ms
                 stopProgram();
             }
-        }, 5000);
+        }, 5000);*/
     }
 
-    private void stopProgram(){
-        //isRunning = false;
-        //btSoundPlayer.setText("Play");
+    private void stopProgram() {
+        isRunning = false;
+        btSoundPlayer.setText("Play");
         stopRecording();
         stopSound();
 
+
     }
 
-    private void playSound (){
-        if(recordedMediaPlayer!=null){
+    private void playSound() {
+        if (recordedMediaPlayer != null) {
             recordedMediaPlayer.release();
             recordedMediaPlayer = null;
         }
 
-        tone= new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
-        tone.startTone(ToneGenerator.TONE_SUP_PIP);
+        tone = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
+        tone.startTone(ToneGenerator.TONE_CDMA_NETWORK_BUSY);
 
     }
 
-    private void stopSound(){
+    private void stopSound() {
         tone.stopTone();
         tone.release();
         tone = null;
-        playRecorded();
+        /*playRecorded();
         recordedMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mediaPlayer) {
@@ -282,13 +267,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 btSoundPlayer.setText("Play");
                 Toast.makeText(requireContext(), "Completed playing recorded", Toast.LENGTH_SHORT).show();
             }
-        });
+        });*/
     }
 
 
-
-    @SuppressLint("MissingPermission")
-    private void recordSound(){
+    private void recordSound() {
         /*int bufferSize = AudioRecord.getMinBufferSize(12000, AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT);
         audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, 12000,
                 AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
@@ -308,8 +291,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 toTransform[i] = (double) buffer[i] / 32768.0;
             }
             //fft.ft(toTransform);
-        }*/
-
+        }
         recorder = new MediaRecorder();
         recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
@@ -321,12 +303,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         } catch (IOException e) {
             Toast.makeText(requireContext(),"Recorder prepare failed.", Toast.LENGTH_SHORT).show();
         }
-        recorder.start();
+        recorder.start();*/
+        recordTask = new RecordAudio();
+        recordTask.execute();
     }
 
-    private void playRecorded(){
+    private void playRecorded() {
         recordedMediaPlayer = new MediaPlayer();
-        try{
+        try {
             recordedMediaPlayer.setDataSource(fileName);
             recordedMediaPlayer.prepare();
             recordedMediaPlayer.start();
@@ -335,13 +319,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
     }
 
-    private void stopRecording(){
-        recorder.stop();
+    private void stopRecording() {
+        /*recorder.stop();
         recorder.release();
-        recorder = null;
+        recorder = null;*/
+        recordTask.cancel(true);
     }
 
-    private void stopPlayingRecorded(){
+    private void stopPlayingRecorded() {
         recordedMediaPlayer.stop();
         recordedMediaPlayer.release();
         recordedMediaPlayer = null;
@@ -383,17 +368,16 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         SensorManager.getOrientation(rotationMatrix, orientationAngles);
 
         // "orientationAngles" now has up-to-date information.
-        for (int i = 0; i < orientationAngles.length; i++){
+        for (int i = 0; i < orientationAngles.length; i++) {
             tvOrientationAngles.append(i + ": " + orientationAngles[i] + "\n");
         }
     }
 
 
-
-    public void startDrawing(){
-        if (timer == null){
+    public void startDrawing() {
+        if (timer == null) {
             timer = new Timer();
-            try{
+            try {
                 timer.scheduleAtFixedRate(new TimerTask() {
                     @Override
                     public void run() {
@@ -410,4 +394,88 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             startDrawing();
         }
     }
+
+
+    private class RecordAudio extends AsyncTask<Void, double[], Void> {
+
+        @Override
+        protected Void doInBackground(Void... arg0) {
+
+            try {
+                // int bufferSize = AudioRecord.getMinBufferSize(frequency,
+                // AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+                int bufferSize = AudioRecord.getMinBufferSize(frequency,
+                        channelConfiguration, audioEncoding);
+
+                //Har checkpermission ved trykk av knappen før denne
+                if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    // TODO: Consider calling
+                    //    ActivityCompat#requestPermissions
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+                    Toast.makeText(requireContext(), "Permission not given.", Toast.LENGTH_SHORT).show();
+                }
+                AudioRecord audioRecord = new AudioRecord(
+                        MediaRecorder.AudioSource.MIC, frequency,
+                        channelConfiguration, audioEncoding, bufferSize);
+
+                short[] buffer = new short[blockSize];
+                double[] toTransform = new double[blockSize];
+
+                audioRecord.startRecording();
+
+                // started = true; hopes this should true before calling
+                // following while loop
+
+                while (isRunning) {
+                    int bufferReadResult = audioRecord.read(buffer, 0,
+                            blockSize);
+
+                    for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
+                        toTransform[i] = (double) buffer[i] / 32768.0; // signed
+                        // 16
+                    }                                       // bit
+                    fft.ft(toTransform);
+                    publishProgress(toTransform);
+
+                }
+
+                audioRecord.stop();
+
+            } catch (Throwable t) {
+                t.printStackTrace();
+                Log.e("AudioRecord", "Recording Failed");
+            }
+            return null;
+        }
+    }
+
+
+     /*public AudioTrack generateTone(double freqHz, int durationMs){
+        int count = (int)(44100.0 * 2.0 * (durationMs / 1000.0)) & ~1;
+        short[] samples = new short[count];
+        for(int i = 0; i < count; i += 10){
+            short sample = (short)(Math.sin(2 * Math.PI * i / (44100.0 / freqHz)) * 0x7FFF);
+            samples[i + 0] = sample;
+            samples[i + 1] = sample;
+        }
+        AudioTrack track = new AudioTrack.Builder()
+                .setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build())
+                .setAudioFormat(new AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(44100)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                    .build())
+                .setBufferSizeInBytes(AudioTrack.getMinBufferSize(44100, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT))
+                .build();
+        track.write(samples, 0, count);
+
+        return track;
+    }*/
 }
