@@ -327,13 +327,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 timer.scheduleAtFixedRate(new TimerTask() {
                     @Override
                     public void run() {
-                        timeStep += 1;
-                        //if ((timeStep % 10) == 0){
-                            y_valueOnGraph = toTransform;
-                            addPointsInGraph();
-                        //}
+//                        timeStep += 1;
+//                        if ((timeStep % 10) == 0){
+//                            //y_valueOnGraph = toTransform;
+//                            //addPointsInGraph();
+//                        }
                     }
-                }, 0, 50);
+                }, 0, 10);
             } catch (IllegalArgumentException iae) {
                 iae.printStackTrace();
             } catch (IllegalStateException ise) {
@@ -399,14 +399,15 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         //Log.d("bufferReadResult, toTransform[i]:", String.valueOf(buffer[i]));
 
                         //nytt
-                        startDrawing(toTransform[i]);
+                        //startDrawing(toTransform[i]);
                         //----------------
                     }                                       // bit
                     fft.ft(toTransform);
                     publishProgress(toTransform);
+
                     Log.d("bufferReadResult, toTransform).average():", String.valueOf(Arrays.stream(toTransform).average()));
-                    //Log.d("bufferReadResult, toTransform).min():", String.valueOf(Arrays.stream(toTransform).min()));
-                    //Log.d("bufferReadResult, toTransform).max():", String.valueOf(Arrays.stream(toTransform).max()));
+                    Log.d("bufferReadResult, toTransform).min():", String.valueOf(Arrays.stream(toTransform).min()));
+                    Log.d("bufferReadResult, toTransform).max():", String.valueOf(Arrays.stream(toTransform).max()));
                 }
 
                 audioRecord.stop();
