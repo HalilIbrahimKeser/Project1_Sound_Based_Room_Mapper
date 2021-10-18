@@ -65,6 +65,7 @@ public class SoundGraphView extends View {
     @Override
     public void draw(Canvas canvas) {
         super.draw(canvas);
+        pathGraph.reset();
         pathBorder.moveTo(30, canvas.getHeight()-200);
         pathBorder.lineTo(canvas.getWidth()-30, canvas.getHeight()-200);
         pathBorder.moveTo(30, 200);
