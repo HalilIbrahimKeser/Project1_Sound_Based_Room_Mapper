@@ -46,6 +46,7 @@ import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -87,9 +88,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
     //NYTT
     int timeStep;
-    ArrayList<XYCoordinates> soundGraphCoordinates;
-    double[] afterFFT;
-    private double beforeFFT;
+    //ArrayList<XYCoordinates> soundGraphCoordinates;
+    //double[] afterFFT;
+    //private double beforeFFT;
+
 
 
 
@@ -151,7 +153,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
         ivGraph = view.findViewById(R.id.ivGraph);
         ivGraph.setScaleY(-1);
-        bmGraph = Bitmap.createBitmap(410, 150, Bitmap.Config.ARGB_8888);
+        bmGraph = Bitmap.createBitmap(420, 150, Bitmap.Config.ARGB_8888);
         graphCanvas = new Canvas(bmGraph);
 
         ivRoom.setImageBitmap(bmRoom);
@@ -249,7 +251,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             recordedMediaPlayer = null;
         }
         tone = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
-        tone.startTone(ToneGenerator.TONE_SUP_PIP);
+        tone.startTone(ToneGenerator.TONE_DTMF_1);
     }
 
     private void stopSound() {
@@ -332,7 +334,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         //Log.d("bufferReadResult, Before toTransform:", String.valueOf(beforeFFT));
                         //Log.d("bufferReadResult, After toTransform:", String.valueOf(afterFFT));
                     }
-                }, 0, 1000);
+                }, 0, 20);
             } catch (IllegalArgumentException | IllegalStateException iae) {
                 iae.printStackTrace();
             }
@@ -387,21 +389,46 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
                         toTransform[i] = (double) buffer[i] / 32768.0; // signed
                     }
-                    beforeFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
+                    //beforeFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
 
                     fft.ft(toTransform);
                     publishProgress(toTransform);
 
                     //afterFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
-                    afterFFT = toTransform;
+                    //afterFFT = toTransform;
                     ArrayList<XYCoordinates> graphCoordinates = new ArrayList<XYCoordinates>();
-                    for (int i = 0; i < afterFFT.length; i++ ) {
 
-                        XYCoordinates coordinate = new XYCoordinates((float) ((i+20)*1.4), (float) afterFFT[i]*80);
+                    //Se på Logcat Debug og tast inn FFT
+                    //Bruker ToneGenerator.TONE_DTMF_1. Frekvensene havner i to områder, en mellom 40 og 50 og en mellom 70 og 80 (fra 1 - 256)
+                    //Vi kan velge enten den som ligger mellom 40 og 50 eller den som ligger mellom 70 og 80 (arrayene frequency40 og frequency70)
+                    //Høyeste verdi i hvert array er "spikes", da må vi få max verdi i arrayet.
+                    //Gjennomsnittsverdien til maksene gir oss et ca nivå på hvor høyt den verdien skal være i forhold til avstand.
+                    //Gjennomsnittsverdiene kan vi bruke til kalibrering. Da må vi spille i forskjellige avstander fra f.eks en vegg
+                    //Lydvolumet må være KONSTANT og frequency som er sendt til Audiorecord er på 8000
+                    //Tar ikke hensyn på materialet til objektet
+                    //Vi må kanskje lagre maks til arrayene i en fil for å kunne bruke til kalibrering?
+                    // Vi må ha kalibreringsverdier for f.eks 0 avstand, 10 cm avstand, osv.... Så interpolerer vi resten?
+                    //Ideen har ikke tatt hensyn til andre sensorverdier, men vi kan sammenligne med avstandssensor
+
+                    ArrayList<Double> frequency40 = new ArrayList<Double>();
+                    ArrayList<Double> frequency70 = new ArrayList<Double>();
+
+                    for (int i = 0; i < toTransform.length; i++ ) {
+                        XYCoordinates coordinate = new XYCoordinates((float) ((i+20)*1.4), (float) toTransform[i]*25);
+                        if (i > 39 && i < 51){
+                            frequency40.add(toTransform[i]);
+                        }
+                        if (i > 69 && i < 81){
+                            frequency70.add(toTransform[i]);
+                        }
                         graphCoordinates.add(coordinate);
-
+                        Log.d("FFT value" + i +": ", String.valueOf(toTransform[i]*100));
                     }
+                    double max40 = Collections.max(frequency40); //spike i 40 området, brukes til kalibrering, lagres med distanseverdi
+                    double max70 = Collections.max(frequency70); //spike i 70 området, brukes til kalibrering, lagres med distanseverdi
+
                     soundGraphView.setGraphCoordinates(graphCoordinates);
+
                 }
 
                 audioRecord.stop();
