@@ -7,8 +7,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Path;
+import android.graphics.PorterDuff;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -30,7 +29,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -42,12 +40,12 @@ import android.widget.Toast;
 
 import com.example.projectsoundbasedroommapper.classes.RoomView;
 import com.example.projectsoundbasedroommapper.classes.SoundGraphView;
-import com.example.projectsoundbasedroommapper.classes.XZCoordinates;
+import com.example.projectsoundbasedroommapper.classes.XYCoordinates;
 import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.OptionalDouble;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -89,8 +87,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
     //NYTT
     int timeStep;
-    double y_valueOnGraph;
-    double averageFFT;
+    ArrayList<XYCoordinates> soundGraphCoordinates;
+    double[] afterFFT;
+    private double beforeFFT;
+
 
 
     public SoundBasedMapperFragment() {
@@ -148,12 +148,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         ivRoom = view.findViewById(R.id.ivRoom);
         bmRoom = Bitmap.createBitmap(1500, 1500, Bitmap.Config.ARGB_8888);
         roomCanvas = new Canvas(bmRoom);
+
         ivGraph = view.findViewById(R.id.ivGraph);
-        bmGraph = Bitmap.createBitmap(1100, 1500, Bitmap.Config.ARGB_8888);
+        ivGraph.setScaleY(-1);
+        bmGraph = Bitmap.createBitmap(410, 150, Bitmap.Config.ARGB_8888);
         graphCanvas = new Canvas(bmGraph);
+
         ivRoom.setImageBitmap(bmRoom);
-
-
+        ivGraph.setImageBitmap(bmGraph); //nytt halil
 
         roomView = new RoomView(requireActivity());
         roomView.draw(roomCanvas);
@@ -179,8 +181,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 }
             }
         });
-
-        startDrawing();
     }
 
     public boolean checkMicAvailability() {
@@ -248,10 +248,8 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             recordedMediaPlayer.release();
             recordedMediaPlayer = null;
         }
-
         tone = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
-        tone.startTone(ToneGenerator.TONE_DTMF_0);
-
+        tone.startTone(ToneGenerator.TONE_SUP_PIP);
     }
 
     private void stopSound() {
@@ -260,10 +258,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         tone = null;
     }
 
-
     private void recordSound() {
         recordTask = new RecordAudio();
         recordTask.execute();
+        startDrawing();
     }
 
     private void playRecorded() {
@@ -330,42 +328,33 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 timer.scheduleAtFixedRate(new TimerTask() {
                     @Override
                     public void run() {
-//                        timeStep += 1;
-//                        if ((timeStep % 10) == 0){
-//                            //y_valueOnGraph = toTransform;
-//                            //addPointsInGraph();
-//                        }
-                        Log.d("bufferReadResult, toTransform).average():", String.valueOf(averageFFT));
+                        drawGraph();
+                        //Log.d("bufferReadResult, Before toTransform:", String.valueOf(beforeFFT));
+                        //Log.d("bufferReadResult, After toTransform:", String.valueOf(afterFFT));
                     }
                 }, 0, 1000);
-            } catch (IllegalArgumentException iae) {
+            } catch (IllegalArgumentException | IllegalStateException iae) {
                 iae.printStackTrace();
-            } catch (IllegalStateException ise) {
-                ise.printStackTrace();
             }
         } else {
             timer = null;
-           //startDrawing();
         }
     }
 
-    public void addPointsInGraph(){
-        soundGraphView.setCircle_y((float) y_valueOnGraph);
-        soundGraphView.setCircle_x(soundGraphView.getCircle_x() + 10);
-        soundGraphView.addPoint(new XZCoordinates(soundGraphView.getCircle_x(),soundGraphView.getCircle_y()));
+    public void drawGraph(){
+        graphCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
+        soundGraphView.draw(graphCanvas);
+        ivGraph.setImageBitmap(bmGraph);
     }
 
+    @SuppressLint("StaticFieldLeak")
     private class RecordAudio extends AsyncTask<Void, double[], Void> {
-
         @Override
         protected Void doInBackground(Void... arg0) {
 
             try {
-                // int bufferSize = AudioRecord.getMinBufferSize(frequency,
-                // AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
                 int bufferSize = AudioRecord.getMinBufferSize(frequency,
                         channelConfiguration, audioEncoding);
-
                 //Har checkpermission ved trykk av knappen før denne
                 if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                     // TODO: Consider calling
@@ -385,6 +374,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 double[] toTransform = new double[blockSize];
                 //double[] transformed = new double[blockSize];
 
+
                 audioRecord.startRecording();
 
                 // started = true; hopes this should true before calling
@@ -394,25 +384,24 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     int bufferReadResult = audioRecord.read(buffer, 0,
                             blockSize);
 
-                    //Log.d("bufferReadResult", String.valueOf(bufferReadResult));
-
                     for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
-                        //Log.d("bufferReadResult, buffer[i]:", String.valueOf(buffer[i]));
-
                         toTransform[i] = (double) buffer[i] / 32768.0; // signed
-                        //Log.d("bufferReadResult, toTransform[i]:", String.valueOf(buffer[i]));
+                    }
+                    beforeFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
 
-                        //nytt
-                        //startDrawing();
-                        //----------------
-                    }                                       // bit
                     fft.ft(toTransform);
                     publishProgress(toTransform);
 
-                    averageFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
-                    //Log.d("bufferReadResult, toTransform).average():", String.valueOf(Arrays.stream(toTransform)));
-                    //Log.d("bufferReadResult, toTransform).min():", String.valueOf(Arrays.stream(toTransform).min()));
-                    //Log.d("bufferReadResult, toTransform).max():", String.valueOf(Arrays.stream(toTransform).max()));
+                    //afterFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
+                    afterFFT = toTransform;
+                    ArrayList<XYCoordinates> graphCoordinates = new ArrayList<XYCoordinates>();
+                    for (int i = 0; i < afterFFT.length; i++ ) {
+
+                        XYCoordinates coordinate = new XYCoordinates((float) ((i+20)*1.2 ), (float) afterFFT[i]*150);
+                        graphCoordinates.add(coordinate);
+
+                    }
+                    soundGraphView.setGraphCoordinates(graphCoordinates);
                 }
 
                 audioRecord.stop();

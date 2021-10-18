@@ -3,6 +3,8 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Android Applikasjoner/sound-mapper-android-studio/app/src/main/res/layout/activity_main.xml" value="0.25" />
+        <entry key="..\:/Android Applikasjoner/sound-mapper-android-studio/app/src/main/res/layout/fragment_sound_based_mapper.xml" value="0.4148550724637681" />
         <entry key="..\:/Users/nancy/AndroidStudioProjects/TaskExercises/ProjectSoundBasedRoomMapper/app/src/main/res/layout/activity_main.xml" value="0.2546875" />
         <entry key="..\:/Users/nancy/AndroidStudioProjects/TaskExercises/ProjectSoundBasedRoomMapper/app/src/main/res/layout/fragment_sound_based_mapper.xml" value="0.2546875" />
       </map>
