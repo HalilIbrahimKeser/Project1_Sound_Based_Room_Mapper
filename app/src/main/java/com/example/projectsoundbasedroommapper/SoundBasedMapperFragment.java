@@ -47,6 +47,7 @@ import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.OptionalDouble;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -89,6 +90,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     //NYTT
     int timeStep;
     double y_valueOnGraph;
+    double averageFFT;
 
 
     public SoundBasedMapperFragment() {
@@ -178,6 +180,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             }
         });
 
+        startDrawing();
     }
 
     public boolean checkMicAvailability() {
@@ -247,7 +250,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
 
         tone = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
-        tone.startTone(ToneGenerator.TONE_CDMA_NETWORK_BUSY);
+        tone.startTone(ToneGenerator.TONE_DTMF_0);
 
     }
 
@@ -320,7 +323,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
     }
 
-    public void startDrawing(double toTransform) {
+    public void startDrawing() {
         if (timer == null) {
             timer = new Timer();
             try {
@@ -332,8 +335,9 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 //                            //y_valueOnGraph = toTransform;
 //                            //addPointsInGraph();
 //                        }
+                        Log.d("bufferReadResult, toTransform).average():", String.valueOf(averageFFT));
                     }
-                }, 0, 10);
+                }, 0, 1000);
             } catch (IllegalArgumentException iae) {
                 iae.printStackTrace();
             } catch (IllegalStateException ise) {
@@ -379,7 +383,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
                 short[] buffer = new short[blockSize];
                 double[] toTransform = new double[blockSize];
-                double[] transformed = new double[blockSize];
+                //double[] transformed = new double[blockSize];
 
                 audioRecord.startRecording();
 
@@ -399,15 +403,16 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         //Log.d("bufferReadResult, toTransform[i]:", String.valueOf(buffer[i]));
 
                         //nytt
-                        //startDrawing(toTransform[i]);
+                        //startDrawing();
                         //----------------
                     }                                       // bit
                     fft.ft(toTransform);
                     publishProgress(toTransform);
 
-                    Log.d("bufferReadResult, toTransform).average():", String.valueOf(Arrays.stream(toTransform).average()));
-                    Log.d("bufferReadResult, toTransform).min():", String.valueOf(Arrays.stream(toTransform).min()));
-                    Log.d("bufferReadResult, toTransform).max():", String.valueOf(Arrays.stream(toTransform).max()));
+                    averageFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
+                    //Log.d("bufferReadResult, toTransform).average():", String.valueOf(Arrays.stream(toTransform)));
+                    //Log.d("bufferReadResult, toTransform).min():", String.valueOf(Arrays.stream(toTransform).min()));
+                    //Log.d("bufferReadResult, toTransform).max():", String.valueOf(Arrays.stream(toTransform).max()));
                 }
 
                 audioRecord.stop();
