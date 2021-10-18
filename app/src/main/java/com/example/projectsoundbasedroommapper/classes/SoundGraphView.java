@@ -10,12 +10,19 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
+
 
 public class SoundGraphView extends View {
 
     private Paint borderPaint, pathPaint, circlePaint;
 
     private Path pathBorder, pathGraph;
+
+    private float circle_x;
+    private float circle_y;
+    private ArrayList<XYCoordinates> graphCoordinates;
+
 
     public SoundGraphView(Context context) {
         super(context);
@@ -34,6 +41,7 @@ public class SoundGraphView extends View {
 
 
     public void init(){
+        graphCoordinates = new ArrayList<XYCoordinates>();
         pathBorder = new Path();
         pathGraph = new Path();
 
@@ -62,6 +70,39 @@ public class SoundGraphView extends View {
         pathBorder.moveTo(30, 200);
         pathBorder.lineTo(canvas.getWidth()-30, 200);
 
+        for (int i = 1; i < graphCoordinates.size(); i++){
+            pathGraph.moveTo(graphCoordinates.get(i-1).getX(), graphCoordinates.get(i-1).getY());
+            pathGraph.lineTo(graphCoordinates.get(i).getX(), graphCoordinates.get(i).getY());
+            canvas.drawPath(pathGraph, pathPaint);
+        }
+
         canvas.drawPath(pathBorder, borderPaint);
+
+        invalidate();
     }
+
+    public ArrayList<XYCoordinates> getGraphCoordinates() {
+        return graphCoordinates;
+    }
+
+    public void setGraphCoordinates(ArrayList<XYCoordinates> graphCoordinates) {
+        this.graphCoordinates = graphCoordinates;
+    }
+
+    public float getCircle_x() {
+        return circle_x;
+    }
+
+    public void setCircle_x(float circle_x) {
+        this.circle_x = circle_x;
+    }
+
+    public float getCircle_y() {
+        return circle_y;
+    }
+
+    public void setCircle_y(float circle_y) {
+        this.circle_y = circle_y;
+    }
+
 }

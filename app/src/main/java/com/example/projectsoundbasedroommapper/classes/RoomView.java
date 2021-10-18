@@ -4,8 +4,6 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.View;
 
@@ -20,7 +18,7 @@ public class RoomView extends View {
     //private Path pathBoundary;
 
 
-    private ArrayList<XZCoordinates> objectCoordinates;
+    private ArrayList<XYCoordinates> objectCoordinates;
 
 
     private float x_value;
@@ -55,9 +53,6 @@ public class RoomView extends View {
         paintBox.setColor(Color.GRAY);
         paintBox.setStyle(Paint.Style.STROKE);
         paintBox.setStrokeWidth(5);
-
-
-
     }
 
     @Override

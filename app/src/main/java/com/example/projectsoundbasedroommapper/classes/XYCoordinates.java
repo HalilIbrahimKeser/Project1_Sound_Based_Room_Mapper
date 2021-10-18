@@ -1,12 +1,12 @@
 package com.example.projectsoundbasedroommapper.classes;
 
-public class XZCoordinates {
+public class XYCoordinates {
     private float x;
-    private float z;
+    private float y;
 
-    public XZCoordinates(float x, float z) {
+    public XYCoordinates(float x, float y) {
         this.x = x;
-        this.z = z;
+        this.y = y;
     }
 
     public float getX() {
@@ -17,12 +17,12 @@ public class XZCoordinates {
         this.x = x;
     }
 
-    public float getZ() {
-        return z;
+    public float getY() {
+        return y;
     }
 
-    public void setZ(float z) {
-        this.z = z;
+    public void setY(float y) {
+        this.y = y;
     }
 
 }

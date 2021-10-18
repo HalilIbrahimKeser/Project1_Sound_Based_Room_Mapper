@@ -26,6 +26,10 @@
  */
 package com.example.projectsoundbasedroommapper.fft;
 
+import android.util.Log;
+
+import java.util.Arrays;
+
 class RealDoubleFFT_Mixed {
   static final int[] ntryh= new int[] {4, 2, 3, 5};
 
@@ -579,6 +583,7 @@ class RealDoubleFFT_Mixed {
         is+=ido;
       }
       l1=l2;
+      Log.d("l1, void rffti1:", String.valueOf(l1));
     }
   } /*rffti1*/
 

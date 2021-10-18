@@ -58,16 +58,15 @@
         <ImageView
             android:id="@+id/ivRoom"
             android:layout_width="match_parent"
-            android:layout_height="320dp"
+            android:layout_height="263dp"
             android:layout_marginBottom="5dp"
             android:background="@color/white"></ImageView>
 
         <ImageView
             android:id="@+id/ivGraph"
             android:layout_width="match_parent"
-            android:layout_height="150dp"
-            android:background="@color/white">
-        </ImageView>
+            android:layout_height="228dp"
+            android:background="@color/white"></ImageView>
 
         <Button
             android:id="@+id/playSound"
