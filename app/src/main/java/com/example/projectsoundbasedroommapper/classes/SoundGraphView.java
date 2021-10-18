@@ -10,12 +10,19 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
+
 
 public class SoundGraphView extends View {
 
     private Paint borderPaint, pathPaint, circlePaint;
 
     private Path pathBorder, pathGraph;
+
+    private float circle_x;
+    private float circle_y;
+    private ArrayList<XZCoordinates> graphCoordinates;
+
 
     public SoundGraphView(Context context) {
         super(context);
@@ -64,4 +71,27 @@ public class SoundGraphView extends View {
 
         canvas.drawPath(pathBorder, borderPaint);
     }
+
+    public void addPoint(XZCoordinates point){
+        //krasjer her
+        graphCoordinates.add(point);
+    }
+
+
+    public float getCircle_x() {
+        return circle_x;
+    }
+
+    public void setCircle_x(float circle_x) {
+        this.circle_x = circle_x;
+    }
+
+    public float getCircle_y() {
+        return circle_y;
+    }
+
+    public void setCircle_y(float circle_y) {
+        this.circle_y = circle_y;
+    }
+
 }
