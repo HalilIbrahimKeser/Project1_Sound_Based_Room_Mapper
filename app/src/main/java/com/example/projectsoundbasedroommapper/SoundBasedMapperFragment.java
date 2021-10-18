@@ -397,7 +397,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     ArrayList<XYCoordinates> graphCoordinates = new ArrayList<XYCoordinates>();
                     for (int i = 0; i < afterFFT.length; i++ ) {
 
-                        XYCoordinates coordinate = new XYCoordinates((float) ((i+20)*1.2 ), (float) afterFFT[i]*150);
+                        XYCoordinates coordinate = new XYCoordinates((float) ((i+20)*1.4), (float) afterFFT[i]*80);
                         graphCoordinates.add(coordinate);
 
                     }
