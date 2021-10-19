@@ -51,7 +51,7 @@ public class SoundGraphView extends View {
 
         pathPaint = new Paint();
         pathPaint.setStyle(Paint.Style.STROKE);
-        pathPaint.setColor(Color.BLACK);
+        pathPaint.setColor(Color.MAGENTA);
 
         circlePaint = new Paint();
         circlePaint.setStyle(Paint.Style.FILL);

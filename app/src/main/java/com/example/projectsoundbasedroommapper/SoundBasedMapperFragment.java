@@ -44,10 +44,14 @@ import com.example.projectsoundbasedroommapper.classes.XYCoordinates;
 import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -267,26 +271,40 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     // -----Husker du han sendte oss angående denne: "This file should look something like: date-time:distance:type(filtered,fft,none)"
                     //har du den fortsatt så kan jeg lagre fft i den andre filen
 
+                    /****For lyd dmtf-1*****/
                     ArrayList<Double> frequency40 = new ArrayList<Double>();
                     ArrayList<Double> frequency70 = new ArrayList<Double>();
 
+                    //For lyd cdma-high
+                    //ArrayList<Double> frequency = new ArrayList<Double>();
+
                     for (int i = 0; i < toTransform.length; i++) {
-                        XYCoordinates coordinate = new XYCoordinates((float) ((i + 8) * 1.55), (float) toTransform[i] * 10);
+                        XYCoordinates coordinate = new XYCoordinates((float) ((i + 8) * 1.55), (float) (toTransform[i] * 10) + 125);
                         if (i > 39 && i < 51) {
-                            frequency40.add(toTransform[i]);
+                            frequency40.add(toTransform[i]*100);
                         }
                         if (i > 69 && i < 81) {
-                            frequency70.add(toTransform[i]);
+                            frequency70.add(toTransform[i]*100);
                         }
+                        /*if (i>229 && i <241){
+                            frequency.add(Math.abs(toTransform[i]) * 100);
+                        }*/
+
                         graphCoordinates.add(coordinate);
                         Log.d("FFT value" + i + ": ", String.valueOf(toTransform[i] * 100));
                     }
                     double max40 = Collections.max(frequency40); //spike i 40 området, brukes til kalibrering, lagres med distanseverdi
                     double max70 = Collections.max(frequency70); //spike i 70 området, brukes til kalibrering, lagres med distanseverdi
 
+                    //double maxCDMI = Collections.max(frequency);
                     soundGraphView.setGraphCoordinates(graphCoordinates);
 
                     saveSpikeMaxInFile(max40, max70);
+
+
+
+
+
                 }
 
                 audioRecord.stop();
@@ -301,7 +319,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private void saveSpikeMaxInFile(double max40, double max70) {
         try {
             streamSpike = new FileWriter(fileSpike, true); //false for å slette gamle verdier i filen
-            streamSpike.write("Max 40:" + max40 + ", Max70: " + max70);
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Date date = new Date(System.currentTimeMillis());
+            String now = dateFormat.format(date);
+            streamSpike.write(now + ": 0cm Max 40:" + max40 + ", Max70: " + max70);
             streamSpike.write("\n");
         } catch (IOException e) {
             e.printStackTrace();
@@ -363,6 +384,12 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private void startProgram() {
         isRunning = true;
         btSoundPlayer.setText("Stop");
+        try {
+            PrintWriter pw = new PrintWriter(fileSpike);
+            pw.close();
+        } catch (FileNotFoundException e) {
+            Log.d("File empty", "error");
+        }
         recordSound();
         playSound();
     }
@@ -420,6 +447,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     @Override
     public void onStop() {
         super.onStop();
+
         mSensorManager.unregisterListener(this);
     }
 
