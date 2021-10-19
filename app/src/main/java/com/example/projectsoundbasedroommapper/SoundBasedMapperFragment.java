@@ -43,9 +43,10 @@ import com.example.projectsoundbasedroommapper.classes.SoundGraphView;
 import com.example.projectsoundbasedroommapper.classes.XYCoordinates;
 import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -55,30 +56,42 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private SensorManager mSensorManager;
     private final float[] accelerometerReading = new float[3];
     private final float[] magnetometerReading = new float[3];
-
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
+
     private Sensor accelerometer;
     private Sensor magneticField;
+
+    private Canvas roomCanvas;
     private TextView tvRotationMatrix;
     private TextView tvOrientationAngles;
     private ImageView ivRoom;
     private ImageView ivGraph;
-    private Canvas roomCanvas;
+
     private Bitmap bmRoom;
     private Bitmap bmGraph;
     private Canvas graphCanvas;
     private Timer timer;
     private boolean isRunning = false;
+
     private Button btSoundPlayer;
     private RoomView roomView;
     private SoundGraphView soundGraphView;
     private MediaRecorder recorder;
-    private static String fileName = null;
     private MediaPlayer recordedMediaPlayer;
     private ToneGenerator tone;
-
     private int blockSize = 256; //for fft
+
+    File fileSpike;
+    FileWriter streamSpike;
+    private static String pathSpikeMaxValue = null;
+    private static final String FILE_NAME_SPIKE = "fileNameSpikeMaxValue.txt";
+
+    File fileRecord;
+    FileWriter streamRecord;
+    private static String fileNameAudioRecord = null;
+    private static final String FILE_NAME_RECORD = "fileNameAudioRecord.txt";
+
     private RealDoubleFFT fft;
     private AudioRecord audioRecord;
     int frequency = 8000;
@@ -91,8 +104,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     //ArrayList<XYCoordinates> soundGraphCoordinates;
     //double[] afterFFT;
     //private double beforeFFT;
-
-
 
 
     public SoundBasedMapperFragment() {
@@ -139,8 +150,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
         fft = new RealDoubleFFT(blockSize);
 
-        fileName = requireContext().getFilesDir().getAbsolutePath();
-        fileName += "/audiorecordtest.3gp";
+//        fileNameAudioRecord = requireContext().getFilesDir().getAbsolutePath(); //path
+//        fileNameAudioRecord += "/audiorecord.3gp";
+
+        pathSpikeMaxValue = requireContext().getFilesDir().getAbsolutePath();
+        fileSpike = new File(pathSpikeMaxValue, FILE_NAME_SPIKE);
 
         boolean hasMic = checkMicAvailability();
         mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
@@ -153,7 +167,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
         ivGraph = view.findViewById(R.id.ivGraph);
         ivGraph.setScaleY(-1);
-        bmGraph = Bitmap.createBitmap(420, 150, Bitmap.Config.ARGB_8888);
+        bmGraph = Bitmap.createBitmap(420, 250, Bitmap.Config.ARGB_8888);
         graphCanvas = new Canvas(bmGraph);
 
         ivRoom.setImageBitmap(bmRoom);
@@ -165,24 +179,139 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         soundGraphView = new SoundGraphView(requireActivity());
         soundGraphView.draw(graphCanvas);
 
-        btSoundPlayer.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (!isRunning) {
-                    if (hasMic) {
-                        //ask for recording permissions
-                        askForRecordingPermission();
-                    } else {
-                        Toast.makeText(requireActivity(),
-                                "This feature will only play a sound without a microphone. Please enjoy this tone.",
-                                Toast.LENGTH_SHORT).show();
-                        playSound();
-                    }
+        btSoundPlayer.setOnClickListener(view1 -> {
+            if (!isRunning) {
+                if (hasMic) {
+                    //ask for recording permissions
+                    askForRecordingPermission();
                 } else {
-                    stopProgram();
+                    Toast.makeText(requireActivity(),
+                            "This feature will only play a sound without a microphone. Please enjoy this tone.",
+                            Toast.LENGTH_SHORT).show();
+                    playSound();
                 }
+            } else {
+                stopProgram();
             }
         });
+    }
+
+    @SuppressLint("StaticFieldLeak")
+    private class RecordAudio extends AsyncTask<Void, double[], Void> {
+        @Override
+        protected Void doInBackground(Void... arg0) {
+
+            try {
+                int bufferSize = AudioRecord.getMinBufferSize(frequency,
+                        channelConfiguration, audioEncoding);
+                //Har checkpermission ved trykk av knappen før denne
+                if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    // TODO: Consider calling
+                    //    ActivityCompat#requestPermissions
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+                    Toast.makeText(requireContext(), "Permission not given.", Toast.LENGTH_SHORT).show();
+                }
+                AudioRecord audioRecord = new AudioRecord(
+                        MediaRecorder.AudioSource.MIC, frequency,
+                        channelConfiguration, audioEncoding, bufferSize);
+
+                short[] buffer = new short[blockSize];
+                double[] toTransform = new double[blockSize];
+                //double[] transformed = new double[blockSize];
+
+
+                audioRecord.startRecording();
+
+                // started = true; hopes this should true before calling
+                // following while loop
+
+                while (isRunning) {
+                    int bufferReadResult = audioRecord.read(buffer, 0,
+                            blockSize);
+
+                    for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
+                        toTransform[i] = (double) buffer[i] / 32768.0; // signed
+                    }
+                    fft.ft(toTransform);
+                    publishProgress(toTransform);
+
+                    ArrayList<XYCoordinates> graphCoordinates = new ArrayList<XYCoordinates>();
+
+                    //Se på Logcat Debug og tast inn FFT
+                    //Bruker ToneGenerator.TONE_DTMF_1. Frekvensene havner i to områder, en mellom 40 og 50 og en mellom 70 og 80 (fra 1 - 256)
+                    // -----Jeg har endret litt i (((bmGraph = Bitmap.createBitmap(420, 250, Bitmap.Config.ARGB_8888);))) og den ((new XYCoordinates((float) ((i + 8) * 1.55), (float) toTransform[i] * 10);))
+
+
+                    //Vi kan velge enten den som ligger mellom 40 og 50 eller den som ligger mellom 70 og 80 (arrayene frequency40 og frequency70)
+                    //Høyeste verdi i hvert array er "spikes", da må vi få max verdi i arrayet.
+                    //Gjennomsnittsverdien til maksene gir oss et ca nivå på hvor høyt den verdien skal være i forhold til avstand.
+                    //Gjennomsnittsverdiene kan vi bruke til kalibrering. Da må vi spille i forskjellige avstander fra f.eks en vegg
+                    // -----Høres bra ut
+
+
+                    //Lydvolumet må være KONSTANT og frequency som er sendt til Audiorecord er på 8000
+                    //Tar ikke hensyn på materialet til objektet
+                    //Vi må kanskje lagre maks til arrayene i en fil for å kunne bruke til kalibrering?
+                    // -----Jeg lagrer nå begge max verdiene i en egen fil
+
+                    // Vi må ha kalibreringsverdier for f.eks 0 avstand, 10 cm avstand, osv.... Så interpolerer vi resten?
+                    // Han sa målingen var ikke så nøye, vi prøver så godt vi kan
+
+                    //Ideen har ikke tatt hensyn til andre sensorverdier, men vi kan sammenligne med avstandssensor
+
+
+                    // -----Husker du han sendte oss angående denne: "This file should look something like: date-time:distance:type(filtered,fft,none)"
+                    //har du den fortsatt så kan jeg lagre fft i den andre filen
+
+                    ArrayList<Double> frequency40 = new ArrayList<Double>();
+                    ArrayList<Double> frequency70 = new ArrayList<Double>();
+
+                    for (int i = 0; i < toTransform.length; i++) {
+                        XYCoordinates coordinate = new XYCoordinates((float) ((i + 8) * 1.55), (float) toTransform[i] * 10);
+                        if (i > 39 && i < 51) {
+                            frequency40.add(toTransform[i]);
+                        }
+                        if (i > 69 && i < 81) {
+                            frequency70.add(toTransform[i]);
+                        }
+                        graphCoordinates.add(coordinate);
+                        Log.d("FFT value" + i + ": ", String.valueOf(toTransform[i] * 100));
+                    }
+                    double max40 = Collections.max(frequency40); //spike i 40 området, brukes til kalibrering, lagres med distanseverdi
+                    double max70 = Collections.max(frequency70); //spike i 70 området, brukes til kalibrering, lagres med distanseverdi
+
+                    soundGraphView.setGraphCoordinates(graphCoordinates);
+
+                    saveSpikeMaxInFile(max40, max70);
+                }
+
+                audioRecord.stop();
+
+            } catch (Throwable t) {
+                t.printStackTrace();
+                Log.e("AudioRecord", "Recording Failed");
+            }
+            return null;
+        }
+    }
+    private void saveSpikeMaxInFile(double max40, double max70) {
+        try {
+            streamSpike = new FileWriter(fileSpike, true); //false for å slette gamle verdier i filen
+            streamSpike.write("Max 40:" + max40 + ", Max70: " + max70);
+            streamSpike.write("\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+            try {
+                streamSpike.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public boolean checkMicAvailability() {
@@ -269,7 +398,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private void playRecorded() {
         recordedMediaPlayer = new MediaPlayer();
         try {
-            recordedMediaPlayer.setDataSource(fileName);
+            recordedMediaPlayer.setDataSource(fileNameAudioRecord);
             recordedMediaPlayer.prepare();
             recordedMediaPlayer.start();
         } catch (IOException e) {
@@ -319,7 +448,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         SensorManager.getOrientation(rotationMatrix, orientationAngles);
 
         for (int i = 0; i < orientationAngles.length; i++) {
-            tvOrientationAngles.append(i + ": " + orientationAngles[i] + "\n");
+            if (i != 2) {
+                tvOrientationAngles.append(i + ": " + orientationAngles[i] + ", ");
+            } else {
+                tvOrientationAngles.append(i + ": " + orientationAngles[i]);
+            }
         }
     }
 
@@ -334,7 +467,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         //Log.d("bufferReadResult, Before toTransform:", String.valueOf(beforeFFT));
                         //Log.d("bufferReadResult, After toTransform:", String.valueOf(afterFFT));
                     }
-                }, 0, 20);
+                }, 0, 50);
             } catch (IllegalArgumentException | IllegalStateException iae) {
                 iae.printStackTrace();
             }
@@ -343,101 +476,9 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
     }
 
-    public void drawGraph(){
+    public void drawGraph() {
         graphCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
         soundGraphView.draw(graphCanvas);
         ivGraph.setImageBitmap(bmGraph);
-    }
-
-    @SuppressLint("StaticFieldLeak")
-    private class RecordAudio extends AsyncTask<Void, double[], Void> {
-        @Override
-        protected Void doInBackground(Void... arg0) {
-
-            try {
-                int bufferSize = AudioRecord.getMinBufferSize(frequency,
-                        channelConfiguration, audioEncoding);
-                //Har checkpermission ved trykk av knappen før denne
-                if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                    // TODO: Consider calling
-                    //    ActivityCompat#requestPermissions
-                    // here to request the missing permissions, and then overriding
-                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                    //                                          int[] grantResults)
-                    // to handle the case where the user grants the permission. See the documentation
-                    // for ActivityCompat#requestPermissions for more details.
-                    Toast.makeText(requireContext(), "Permission not given.", Toast.LENGTH_SHORT).show();
-                }
-                AudioRecord audioRecord = new AudioRecord(
-                        MediaRecorder.AudioSource.MIC, frequency,
-                        channelConfiguration, audioEncoding, bufferSize);
-
-                short[] buffer = new short[blockSize];
-                double[] toTransform = new double[blockSize];
-                //double[] transformed = new double[blockSize];
-
-
-                audioRecord.startRecording();
-
-                // started = true; hopes this should true before calling
-                // following while loop
-
-                while (isRunning) {
-                    int bufferReadResult = audioRecord.read(buffer, 0,
-                            blockSize);
-
-                    for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
-                        toTransform[i] = (double) buffer[i] / 32768.0; // signed
-                    }
-                    //beforeFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
-
-                    fft.ft(toTransform);
-                    publishProgress(toTransform);
-
-                    //afterFFT = Arrays.stream(toTransform).min().orElse(Double.NaN);
-                    //afterFFT = toTransform;
-                    ArrayList<XYCoordinates> graphCoordinates = new ArrayList<XYCoordinates>();
-
-                    //Se på Logcat Debug og tast inn FFT
-                    //Bruker ToneGenerator.TONE_DTMF_1. Frekvensene havner i to områder, en mellom 40 og 50 og en mellom 70 og 80 (fra 1 - 256)
-                    //Vi kan velge enten den som ligger mellom 40 og 50 eller den som ligger mellom 70 og 80 (arrayene frequency40 og frequency70)
-                    //Høyeste verdi i hvert array er "spikes", da må vi få max verdi i arrayet.
-                    //Gjennomsnittsverdien til maksene gir oss et ca nivå på hvor høyt den verdien skal være i forhold til avstand.
-                    //Gjennomsnittsverdiene kan vi bruke til kalibrering. Da må vi spille i forskjellige avstander fra f.eks en vegg
-                    //Lydvolumet må være KONSTANT og frequency som er sendt til Audiorecord er på 8000
-                    //Tar ikke hensyn på materialet til objektet
-                    //Vi må kanskje lagre maks til arrayene i en fil for å kunne bruke til kalibrering?
-                    // Vi må ha kalibreringsverdier for f.eks 0 avstand, 10 cm avstand, osv.... Så interpolerer vi resten?
-                    //Ideen har ikke tatt hensyn til andre sensorverdier, men vi kan sammenligne med avstandssensor
-
-                    ArrayList<Double> frequency40 = new ArrayList<Double>();
-                    ArrayList<Double> frequency70 = new ArrayList<Double>();
-
-                    for (int i = 0; i < toTransform.length; i++ ) {
-                        XYCoordinates coordinate = new XYCoordinates((float) ((i+20)*1.4), (float) toTransform[i]*25);
-                        if (i > 39 && i < 51){
-                            frequency40.add(toTransform[i]);
-                        }
-                        if (i > 69 && i < 81){
-                            frequency70.add(toTransform[i]);
-                        }
-                        graphCoordinates.add(coordinate);
-                        Log.d("FFT value" + i +": ", String.valueOf(toTransform[i]*100));
-                    }
-                    double max40 = Collections.max(frequency40); //spike i 40 området, brukes til kalibrering, lagres med distanseverdi
-                    double max70 = Collections.max(frequency70); //spike i 70 området, brukes til kalibrering, lagres med distanseverdi
-
-                    soundGraphView.setGraphCoordinates(graphCoordinates);
-
-                }
-
-                audioRecord.stop();
-
-            } catch (Throwable t) {
-                t.printStackTrace();
-                Log.e("AudioRecord", "Recording Failed");
-            }
-            return null;
-        }
     }
 }

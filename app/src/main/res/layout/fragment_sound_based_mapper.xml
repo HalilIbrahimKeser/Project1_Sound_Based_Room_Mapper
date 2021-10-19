@@ -3,77 +3,82 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".SoundBasedMapperFragment"
-    android:background="@color/cardview_shadow_start_color">
+    android:background="@color/cardview_shadow_start_color"
+    tools:context=".SoundBasedMapperFragment">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <LinearLayout
+
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="5dp">
+            android:layout_height="wrap_content">
 
-            <TextView
-                android:id="@+id/tvRotationLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Rotation Matrix:"
-                android:textSize="20sp"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tvRotationMatrix"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0, 0, 0"
-                android:paddingStart="5dp"
-                android:textSize="20sp"/>
+                <TextView
+                    android:id="@+id/tvRotationLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/rotation_matrix"
+                    android:textSize="14sp" />
 
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/tvRotationMatrix"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="5dp"
+                    android:text="@string/_0_0_0"
+                    android:textSize="16sp" />
 
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/tvOrientationLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/orientation_angles"
+                    android:textSize="14sp" />
 
-            <TextView
-                android:id="@+id/tvOrientationLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Orientation Angles:"
-                android:textSize="20sp"/>
-            <TextView
-                android:id="@+id/tvOrientationAngles"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0, 0, 0"
-                android:textSize="20sp"
-                android:paddingStart="5dp"/>
+                <TextView
+                    android:id="@+id/tvOrientationAngles"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="5dp"
+                    android:text="@string/_0_0_0"
+                    android:textSize="16sp" />
+            </LinearLayout>
 
-        </LinearLayout>
+
+        </ScrollView>
+
 
         <ImageView
             android:id="@+id/ivRoom"
             android:layout_width="match_parent"
-            android:layout_height="263dp"
+            android:layout_height="299dp"
             android:layout_marginBottom="5dp"
-            android:background="@color/white"></ImageView>
+            android:background="@color/white"
+            android:contentDescription="@string/room" />
 
         <ImageView
             android:id="@+id/ivGraph"
             android:layout_width="match_parent"
-            android:layout_height="228dp"
-            android:background="@color/white"></ImageView>
+            android:layout_height="297dp"
+            android:background="@color/white"
+            android:contentDescription="@string/graph" />
 
         <Button
             android:id="@+id/playSound"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="Play"/>
+            android:text="@string/play" />
     </LinearLayout>
 
 </FrameLayout>

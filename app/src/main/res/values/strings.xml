@@ -1,5 +1,10 @@
 <resources>
     <string name="app_name">Project Sound Based Room Mapper</string>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <string name="play">Play</string>
+    <string name="_0_0_0">0, 0, 0</string>
+    <string name="rotation_matrix">Rotation Matrix:</string>
+    <string name="room">Room</string>
+    <string name="graph">Graph</string>
+    <string name="orientation_angles">Orientation Angles:</string>
 </resources>
