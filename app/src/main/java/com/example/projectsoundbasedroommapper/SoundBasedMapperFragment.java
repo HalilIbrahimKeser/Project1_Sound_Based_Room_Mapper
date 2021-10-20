@@ -96,7 +96,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private static String fileNameAudioRecord = null;
     private static final String FILE_NAME_RECORD = "fileNameAudioRecord.txt";
 
-    private RealDoubleFFT fft;
+    private RealDoubleFFT fft; //Class Source: https://github.com/bewantbe/audio-analyzer-for-android
     private AudioRecord audioRecord;
     int frequency = 8000;
     int channelConfiguration = AudioFormat.CHANNEL_IN_MONO;
@@ -201,6 +201,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     }
 
     @SuppressLint("StaticFieldLeak")
+    //Source: https://stackoverflow.com/questions/5511250/capturing-sound-for-analysis-and-visualizing-frequencies-in-android
     private class RecordAudio extends AsyncTask<Void, double[], Void> {
         @Override
         protected Void doInBackground(Void... arg0) {
@@ -530,7 +531,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         ivGraph.setImageBitmap(bmGraph);
     }
 
-    //hardcoded based on an external calibration curve, trendline is quadratic
+    //hardcoded based on calibration curve saved on Excel, based on trendline
     private double calculateDistance(double fft ){
         //based on frequency in area 40, power equation based on calibration values
         //x = 0.00014y^2 - 0.0601y + 12.151
