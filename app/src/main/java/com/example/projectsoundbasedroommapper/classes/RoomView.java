@@ -45,7 +45,7 @@ public class RoomView extends View {
         paintPerson = new Paint();
         paintBox = new Paint();
         paintCircle.setColor(Color.BLUE);
-        paintCircle.setStyle(Paint.Style.STROKE);
+        paintCircle.setStyle(Paint.Style.FILL);
         paintCircle.setStrokeWidth(5);
         paintPerson.setColor(Color.RED);
         paintPerson.setStyle(Paint.Style.FILL);
@@ -53,19 +53,21 @@ public class RoomView extends View {
         paintBox.setColor(Color.GRAY);
         paintBox.setStyle(Paint.Style.STROKE);
         paintBox.setStrokeWidth(5);
+
     }
 
     @Override
     public void draw(Canvas canvas) {
         super.draw(canvas);
         //TODO
-        if (z_value != 0.0 && x_value != 0.0){
-            //draw position of object
-        }
-
         float my_x_pos = canvas.getWidth()/2;
         float my_z_pos = canvas.getHeight()/2;
+        x_value = my_x_pos;
 
+        if (z_value != 0.0){
+
+            canvas.drawCircle(x_value, x_value + (z_value*20), 70, paintCircle);
+        }
         canvas.drawCircle(my_x_pos, my_z_pos, 40, paintPerson);
 
         canvas.drawRect(20, 100, canvas.getWidth()-30, canvas.getHeight()-100, paintBox);

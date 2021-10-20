@@ -104,11 +104,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private RecordAudio recordTask;
 
     //NYTT
-    int timeStep;
     //ArrayList<XYCoordinates> soundGraphCoordinates;
     //double[] afterFFT;
     //private double beforeFFT;
-
+    private double currentFFTSpike = 0.0;
+    private int timeStep = 0;
 
     public SoundBasedMapperFragment() {
     }
@@ -291,11 +291,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         }*/
 
                         graphCoordinates.add(coordinate);
-                        Log.d("FFT value" + i + ": ", String.valueOf(toTransform[i] * 100));
+                        //Log.d("FFT value" + i + ": ", String.valueOf(toTransform[i] * 100));
                     }
                     double max40 = Collections.max(frequency40); //spike i 40 området, brukes til kalibrering, lagres med distanseverdi
                     double max70 = Collections.max(frequency70); //spike i 70 området, brukes til kalibrering, lagres med distanseverdi
+                    currentFFTSpike = max40;
 
+
+                    //Log.d("Spike", currentFFTSpike +"");
                     //double maxCDMI = Collections.max(frequency);
                     soundGraphView.setGraphCoordinates(graphCoordinates);
 
@@ -492,6 +495,19 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     @Override
                     public void run() {
                         drawGraph();
+                        timeStep+=1;
+                        if(timeStep%20 == 0){
+                            double currentDistance = calculateDistance(currentFFTSpike);
+                            Log.d("Current pos", currentDistance + "");
+                            roomView.setZ_value((float) currentDistance);
+                            roomCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
+                            roomView.draw(roomCanvas);
+                            ivRoom.setImageBitmap(bmRoom);
+                        }
+
+
+                            //updateDistanceText(currentDistance);
+
                         //Log.d("bufferReadResult, Before toTransform:", String.valueOf(beforeFFT));
                         //Log.d("bufferReadResult, After toTransform:", String.valueOf(afterFFT));
                     }
@@ -504,9 +520,23 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
     }
 
+    private void updateDistanceText(double distance) {
+        tvRotationMatrix.setText(distance + "");
+    }
+
     public void drawGraph() {
         graphCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
         soundGraphView.draw(graphCanvas);
         ivGraph.setImageBitmap(bmGraph);
+    }
+
+    //hardcoded based on an external calibration curve, trendline is quadratic
+    private double calculateDistance(double fft ){
+        //based on frequency in area 40, power equation based on calibration values
+        //x = 0.00014y^2 - 0.0601y + 12.151
+        //get x = distance
+        //fft = y
+        double x = (0.00014 * Math.pow(fft, 2)) - (0.0601 * fft) + 12.151;
+        return x;
     }
 }
