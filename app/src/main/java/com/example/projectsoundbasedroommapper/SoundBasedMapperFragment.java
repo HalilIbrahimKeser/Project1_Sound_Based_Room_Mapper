@@ -120,7 +120,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private MediaRecorder recorder;
     private MediaPlayer recordedMediaPlayer;
     private ToneGenerator tone;
-    private int blockSize = 256; //for fft
+    private final int blockSize = 256; //for fft
 
     File fileSpike;
     FileWriter streamSpike;
@@ -384,6 +384,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 }
             });
 
+    @SuppressLint("SetTextI18n")
     private void startProgram() {
         isRunning = true;
         btSoundPlayer.setText("Stop");
@@ -444,7 +445,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         recordedMediaPlayer.stop();
         recordedMediaPlayer.release();
         recordedMediaPlayer = null;
-
     }
 
     @Override
