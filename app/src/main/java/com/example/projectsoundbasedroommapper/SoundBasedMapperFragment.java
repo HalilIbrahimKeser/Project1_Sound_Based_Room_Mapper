@@ -29,6 +29,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -67,7 +69,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private Sensor magneticField;
 
     private Canvas roomCanvas;
-    private TextView tvRotationMatrix;
+    private TextView tvDistance;
     private TextView tvOrientationAngles;
     private ImageView ivRoom;
     private ImageView ivGraph;
@@ -75,13 +77,15 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private Bitmap bmRoom;
     private Bitmap bmGraph;
     private Canvas graphCanvas;
+
     private Timer timer;
     private boolean isRunning = false;
+    private int timeStep = 0;
+    private Handler handler;
 
     private Button btSoundPlayer;
     private RoomView roomView;
     private SoundGraphView soundGraphView;
-    private MediaRecorder recorder;
     private MediaPlayer recordedMediaPlayer;
     private ToneGenerator tone;
     private int blockSize = 256; //for fft
@@ -91,24 +95,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private static String pathSpikeMaxValue = null;
     private static final String FILE_NAME_SPIKE = "fileNameSpikeMaxValue.txt";
 
-    File fileRecord;
-    FileWriter streamRecord;
-    private static String fileNameAudioRecord = null;
-    private static final String FILE_NAME_RECORD = "fileNameAudioRecord.txt";
-
     private RealDoubleFFT fft; //Class Source: https://github.com/bewantbe/audio-analyzer-for-android
-    private AudioRecord audioRecord;
     int frequency = 8000;
     int channelConfiguration = AudioFormat.CHANNEL_IN_MONO;
     int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
     private RecordAudio recordTask;
-
-    //NYTT
-    //ArrayList<XYCoordinates> soundGraphCoordinates;
-    //double[] afterFFT;
-    //private double beforeFFT;
     private double currentFFTSpike = 0.0;
-    private int timeStep = 0;
+    private double currentDistance;
+    private ArrayList<Double> fftAverageHolder;
 
     public SoundBasedMapperFragment() {
     }
@@ -150,12 +144,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        handler = new Handler(Looper.getMainLooper());
         btSoundPlayer = view.findViewById(R.id.playSound);
 
         fft = new RealDoubleFFT(blockSize);
-
-//        fileNameAudioRecord = requireContext().getFilesDir().getAbsolutePath(); //path
-//        fileNameAudioRecord += "/audiorecord.3gp";
 
         pathSpikeMaxValue = requireContext().getFilesDir().getAbsolutePath();
         fileSpike = new File(pathSpikeMaxValue, FILE_NAME_SPIKE);
@@ -163,7 +155,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         boolean hasMic = checkMicAvailability();
         mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
         tvOrientationAngles = view.findViewById(R.id.tvOrientationAngles);
-        tvRotationMatrix = view.findViewById(R.id.tvRotationMatrix);
+        tvDistance = view.findViewById(R.id.tvDistance);
 
         ivRoom = view.findViewById(R.id.ivRoom);
         bmRoom = Bitmap.createBitmap(1500, 1500, Bitmap.Config.ARGB_8888);
@@ -186,7 +178,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         btSoundPlayer.setOnClickListener(view1 -> {
             if (!isRunning) {
                 if (hasMic) {
-                    //ask for recording permissions
                     askForRecordingPermission();
                 } else {
                     Toast.makeText(requireActivity(),
@@ -207,17 +198,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         protected Void doInBackground(Void... arg0) {
 
             try {
+                if (fftAverageHolder == null){
+                    fftAverageHolder = new ArrayList<Double>();
+                }
                 int bufferSize = AudioRecord.getMinBufferSize(frequency,
                         channelConfiguration, audioEncoding);
-                //Har checkpermission ved trykk av knappen før denne
+                //Placed here because it is persisting. By this part, permission is already checked with the method askForRecordingPermission.
                 if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                    // TODO: Consider calling
-                    //    ActivityCompat#requestPermissions
-                    // here to request the missing permissions, and then overriding
-                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                    //                                          int[] grantResults)
-                    // to handle the case where the user grants the permission. See the documentation
-                    // for ActivityCompat#requestPermissions for more details.
                     Toast.makeText(requireContext(), "Permission not given.", Toast.LENGTH_SHORT).show();
                 }
                 AudioRecord audioRecord = new AudioRecord(
@@ -226,15 +213,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
                 short[] buffer = new short[blockSize];
                 double[] toTransform = new double[blockSize];
-                //double[] transformed = new double[blockSize];
-
 
                 audioRecord.startRecording();
 
-                // started = true; hopes this should true before calling
-                // following while loop
-
                 while (isRunning) {
+                    if(fftAverageHolder.size() == 30){
+                        fftAverageHolder.clear();
+                    }
                     int bufferReadResult = audioRecord.read(buffer, 0,
                             blockSize);
 
@@ -272,43 +257,34 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     // -----Husker du han sendte oss angående denne: "This file should look something like: date-time:distance:type(filtered,fft,none)"
                     //har du den fortsatt så kan jeg lagre fft i den andre filen
 
-                    /****For lyd dmtf-1*****/
-                    ArrayList<Double> frequency40 = new ArrayList<Double>();
-                    ArrayList<Double> frequency70 = new ArrayList<Double>();
 
-                    //For lyd cdma-high
-                    //ArrayList<Double> frequency = new ArrayList<Double>();
+                    ArrayList<Double> frequency40 = new ArrayList<Double>();
+
+
 
                     for (int i = 0; i < toTransform.length; i++) {
                         XYCoordinates coordinate = new XYCoordinates((float) ((i + 8) * 1.55), (float) (toTransform[i] * 10) + 125);
                         if (i > 39 && i < 51) {
                             frequency40.add(toTransform[i]*100);
                         }
-                        if (i > 69 && i < 81) {
+                        /*if (i > 69 && i < 81) {
                             frequency70.add(toTransform[i]*100);
-                        }
-                        /*if (i>229 && i <241){
-                            frequency.add(Math.abs(toTransform[i]) * 100);
                         }*/
-
                         graphCoordinates.add(coordinate);
+
                         //Log.d("FFT value" + i + ": ", String.valueOf(toTransform[i] * 100));
                     }
                     double max40 = Collections.max(frequency40); //spike i 40 området, brukes til kalibrering, lagres med distanseverdi
-                    double max70 = Collections.max(frequency70); //spike i 70 området, brukes til kalibrering, lagres med distanseverdi
-                    currentFFTSpike = max40;
+                    fftAverageHolder.add(max40);
+                    if (fftAverageHolder.size() == 30){
+                        double total = 0.0;
+                        for(int i = 0; i < 30; i++){
+                            total += fftAverageHolder.get(i);
+                        }
+                        currentFFTSpike = total/30;
+                    }
 
-
-                    //Log.d("Spike", currentFFTSpike +"");
-                    //double maxCDMI = Collections.max(frequency);
                     soundGraphView.setGraphCoordinates(graphCoordinates);
-
-                    saveSpikeMaxInFile(max40, max70);
-
-
-
-
-
                 }
 
                 audioRecord.stop();
@@ -320,13 +296,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             return null;
         }
     }
-    private void saveSpikeMaxInFile(double max40, double max70) {
+    private void saveDistance(double distance) {
         try {
             streamSpike = new FileWriter(fileSpike, true); //false for å slette gamle verdier i filen
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             Date date = new Date(System.currentTimeMillis());
             String now = dateFormat.format(date);
-            streamSpike.write(now + ": 0cm Max 40:" + max40 + ", Max70: " + max70);
+            streamSpike.write(now + "- distance: " + distance + "-type: fft");
             streamSpike.write("\n");
         } catch (IOException e) {
             e.printStackTrace();
@@ -348,39 +324,25 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
     }
 
+    //Source: https://developer.android.com/training/permissions/requesting#java
     public void askForRecordingPermission() {
         if (ContextCompat.checkSelfPermission(
                 requireContext(), Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED) {
-            // You can use the API that requires the permission.
-            //performAction(...);
             startProgram();
         } else if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
-            // In an educational UI, explain to the user why your app requires this
-            // permission for a specific feature to behave as expected. In this UI,
-            // include a "cancel" or "no thanks" button that allows the user to
-            // continue using your app without granting the permission.
-            //showInContextUI(...);
             Toast.makeText(requireActivity(), "Needs dialog.", Toast.LENGTH_SHORT).show();
         } else {
-            // You can directly ask for the permission.
-            // The registered ActivityResultCallback gets the result of this request.
             requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
         }
     }
 
+    //Source: https://developer.android.com/training/permissions/requesting#java
     private ActivityResultLauncher<String> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
                 if (isGranted) {
-                    // Permission is granted. Continue the action or workflow in your
-                    // app.
                     startProgram();
                 } else {
-                    // Explain to the user that the feature is unavailable because the
-                    // features requires a permission that the user has denied. At the
-                    // same time, respect the user's decision. Don't link to system
-                    // settings in an effort to convince the user to change their
-                    // decision.
                     Toast.makeText(requireActivity(), "This button will only play a sound.", Toast.LENGTH_SHORT).show();
                 }
             });
@@ -426,26 +388,8 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         startDrawing();
     }
 
-    private void playRecorded() {
-        recordedMediaPlayer = new MediaPlayer();
-        try {
-            recordedMediaPlayer.setDataSource(fileNameAudioRecord);
-            recordedMediaPlayer.prepare();
-            recordedMediaPlayer.start();
-        } catch (IOException e) {
-            Toast.makeText(requireContext(), "Mediaplayer has failed.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     private void stopRecording() {
         recordTask.cancel(true);
-    }
-
-    private void stopPlayingRecorded() {
-        recordedMediaPlayer.stop();
-        recordedMediaPlayer.release();
-        recordedMediaPlayer = null;
-
     }
 
     @Override
@@ -498,19 +442,17 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         drawGraph();
                         timeStep+=1;
                         if(timeStep%20 == 0){
-                            double currentDistance = calculateDistance(currentFFTSpike);
+                            currentDistance = calculateDistance(currentFFTSpike);
+                            saveDistance(currentDistance);
+                            handler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                   updateDistanceText(currentDistance);
+                                }
+                            });
                             Log.d("Current pos", currentDistance + "");
-                            roomView.setZ_value((float) currentDistance);
-                            roomCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
-                            roomView.draw(roomCanvas);
-                            ivRoom.setImageBitmap(bmRoom);
+                            drawObject(currentDistance);
                         }
-
-
-                            //updateDistanceText(currentDistance);
-
-                        //Log.d("bufferReadResult, Before toTransform:", String.valueOf(beforeFFT));
-                        //Log.d("bufferReadResult, After toTransform:", String.valueOf(afterFFT));
                     }
                 }, 0, 50);
             } catch (IllegalArgumentException | IllegalStateException iae) {
@@ -521,23 +463,42 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         }
     }
 
+    private void drawObject(double currentDistance){
+        if (!roomView.isStarted()){
+            roomView.setStarted(true);
+        }
+        roomView.setZ_value((float) currentDistance);
+        roomCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
+        roomView.draw(roomCanvas);
+        ivRoom.setImageBitmap(bmRoom);
+    }
+
     private void updateDistanceText(double distance) {
-        tvRotationMatrix.setText(distance + "");
+        tvDistance.setText(distance + "");
     }
 
     public void drawGraph() {
+        if (currentDistance < 0.5){
+            soundGraphView.setClose(true);
+        } else{
+            soundGraphView.setClose(false);
+        }
         graphCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
         soundGraphView.draw(graphCanvas);
         ivGraph.setImageBitmap(bmGraph);
     }
 
-    //hardcoded based on calibration curve saved on Excel, based on trendline
+    //hardcoded based on calibration curve that is made with a trendline in Excel
     private double calculateDistance(double fft ){
         //based on frequency in area 40, power equation based on calibration values
-        //x = 0.00014y^2 - 0.0601y + 12.151
+        //x = 0.0007y^2 - 0.0601y + 12.151
         //get x = distance
         //fft = y
-        double x = (0.00014 * Math.pow(fft, 2)) - (0.0601 * fft) + 12.151;
+        //double x = (0.00014 * Math.pow(fft, 2)) - (0.0601 * fft) + 12.151;
+        double x = (0.00007 * Math.pow(fft, 2)) - (0.0601*fft) + 12.151;
+        if (x < 0.0){
+            x = 0.0;
+        }
         return x;
     }
 }

@@ -20,7 +20,7 @@ public class RoomView extends View {
 
     private ArrayList<XYCoordinates> objectCoordinates;
 
-
+    private boolean started = false;
     private float x_value;
     private float z_value;
 
@@ -64,7 +64,7 @@ public class RoomView extends View {
         float my_z_pos = canvas.getHeight()/2;
         x_value = my_x_pos;
 
-        if (z_value != 0.0){
+        if (started){
 
             canvas.drawCircle(x_value, x_value + (z_value*20), 70, paintCircle);
         }
@@ -90,4 +90,11 @@ public class RoomView extends View {
         this.z_value = z_value;
     }
 
+    public boolean isStarted() {
+        return started;
+    }
+
+    public void setStarted(boolean started) {
+        this.started = started;
+    }
 }

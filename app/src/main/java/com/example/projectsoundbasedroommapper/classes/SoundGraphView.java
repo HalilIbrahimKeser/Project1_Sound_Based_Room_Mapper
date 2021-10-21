@@ -22,6 +22,7 @@ public class SoundGraphView extends View {
     private float circle_x;
     private float circle_y;
     private ArrayList<XYCoordinates> graphCoordinates;
+    private boolean isClose = false;
 
 
     public SoundGraphView(Context context) {
@@ -51,7 +52,7 @@ public class SoundGraphView extends View {
 
         pathPaint = new Paint();
         pathPaint.setStyle(Paint.Style.STROKE);
-        pathPaint.setColor(Color.MAGENTA);
+        pathPaint.setColor(Color.GREEN);
 
         circlePaint = new Paint();
         circlePaint.setStyle(Paint.Style.FILL);
@@ -70,6 +71,11 @@ public class SoundGraphView extends View {
         pathBorder.lineTo(canvas.getWidth()-30, canvas.getHeight()-200);
         pathBorder.moveTo(30, 200);
         pathBorder.lineTo(canvas.getWidth()-30, 200);
+        if (isClose){
+            pathPaint.setColor(Color.MAGENTA);
+        } else{
+            pathPaint.setColor(Color.GREEN);
+        }
 
         for (int i = 1; i < graphCoordinates.size(); i++){
             pathGraph.moveTo(graphCoordinates.get(i-1).getX(), graphCoordinates.get(i-1).getY());
@@ -106,4 +112,11 @@ public class SoundGraphView extends View {
         this.circle_y = circle_y;
     }
 
+    public boolean isClose() {
+        return isClose;
+    }
+
+    public void setClose(boolean close) {
+        isClose = close;
+    }
 }
