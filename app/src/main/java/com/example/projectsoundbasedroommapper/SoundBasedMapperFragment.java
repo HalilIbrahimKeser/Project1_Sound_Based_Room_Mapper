@@ -41,6 +41,7 @@ import android.widget.Toast;
 import com.example.projectsoundbasedroommapper.classes.RoomView;
 import com.example.projectsoundbasedroommapper.classes.SoundGraphView;
 import com.example.projectsoundbasedroommapper.classes.XYCoordinates;
+import com.example.projectsoundbasedroommapper.databinding.FragmentSoundBasedMapperBinding;
 import com.example.projectsoundbasedroommapper.fft.RealDoubleFFT;
 
 import java.io.File;
@@ -55,20 +56,55 @@ import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
+
+//Se på Logcat Debug og tast inn FFT
+//Bruker ToneGenerator.TONE_DTMF_1. Frekvensene havner i to områder, en mellom 40 og 50 og en mellom 70 og 80 (fra 1 - 256)
+// -----Jeg har endret litt i (((bmGraph = Bitmap.createBitmap(420, 250, Bitmap.Config.ARGB_8888);))) og den ((new XYCoordinates((float) ((i + 8) * 1.55), (float) toTransform[i] * 10);))
+
+
+//Vi kan velge enten den som ligger mellom 40 og 50 eller den som ligger mellom 70 og 80 (arrayene frequency40 og frequency70)
+//Høyeste verdi i hvert array er "spikes", da må vi få max verdi i arrayet.
+//Gjennomsnittsverdien til maksene gir oss et ca nivå på hvor høyt den verdien skal være i forhold til avstand.
+//Gjennomsnittsverdiene kan vi bruke til kalibrering. Da må vi spille i forskjellige avstander fra f.eks en vegg
+// -----Høres bra ut
+
+
+//Lydvolumet må være KONSTANT og frequency som er sendt til Audiorecord er på 8000
+//Tar ikke hensyn på materialet til objektet
+//Vi må kanskje lagre maks til arrayene i en fil for å kunne bruke til kalibrering?
+// -----Jeg lagrer nå begge max verdiene i en egen fil
+
+// Vi må ha kalibreringsverdier for f.eks 0 avstand, 10 cm avstand, osv.... Så interpolerer vi resten?
+// Han sa målingen var ikke så nøye, vi prøver så godt vi kan
+
+//Ideen har ikke tatt hensyn til andre sensorverdier, men vi kan sammenligne med avstandssensor
+
+
+// -----Husker du han sendte oss angående denne: "This file should look something like: date-time:distance:type(filtered,fft,none)"
+//har du den fortsatt så kan jeg lagre fft i den andre filen
+
+
 public class SoundBasedMapperFragment extends Fragment implements SensorEventListener {
 
+    Context context;
+    private FragmentSoundBasedMapperBinding binding;
+
     private SensorManager mSensorManager;
+    private Sensor mMagneticFieldSensor;
+    private Sensor mAccelerometerSensor;
     private final float[] accelerometerReading = new float[3];
     private final float[] magnetometerReading = new float[3];
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
 
-    private Sensor accelerometer;
-    private Sensor magneticField;
+    float[] mGravity;
+    float[] mGeomagnetic;
 
     private Canvas roomCanvas;
     private TextView tvRotationMatrix;
     private TextView tvOrientationAngles;
+    private TextView tvRotationLabel;
+    private TextView tvOrientationLabel;
     private ImageView ivRoom;
     private ImageView ivGraph;
 
@@ -88,13 +124,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
     File fileSpike;
     FileWriter streamSpike;
-    private static String pathSpikeMaxValue = null;
     private static final String FILE_NAME_SPIKE = "fileNameSpikeMaxValue.txt";
-
     File fileRecord;
     FileWriter streamRecord;
-    private static String fileNameAudioRecord = null;
-    private static final String FILE_NAME_RECORD = "fileNameAudioRecord.txt";
+    private static final String FILE_NAME_AUDIO_RECORD = "fileNameAudioRecord.txt";
 
     private RealDoubleFFT fft; //Class Source: https://github.com/bewantbe/audio-analyzer-for-android
     private AudioRecord audioRecord;
@@ -103,10 +136,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
     private RecordAudio recordTask;
 
-    //NYTT
-    //ArrayList<XYCoordinates> soundGraphCoordinates;
-    //double[] afterFFT;
-    //private double beforeFFT;
     private double currentFFTSpike = 0.0;
     private int timeStep = 0;
 
@@ -131,45 +160,54 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_sound_based_mapper, container, false);
+        binding = FragmentSoundBasedMapperBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        accelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        if (accelerometer != null) {
-            mSensorManager.registerListener(this, accelerometer, mSensorManager.SENSOR_DELAY_NORMAL);
+        mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        if (mAccelerometerSensor != null) {
+            mSensorManager.registerListener(this, mAccelerometerSensor, mSensorManager.SENSOR_DELAY_NORMAL);
         }
-        magneticField = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        if (magneticField != null) {
-            mSensorManager.registerListener(this, magneticField, mSensorManager.SENSOR_DELAY_NORMAL);
+        mMagneticFieldSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        if (mMagneticFieldSensor != null) {
+            mSensorManager.registerListener(this, mMagneticFieldSensor, mSensorManager.SENSOR_DELAY_NORMAL);
         }
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        btSoundPlayer = view.findViewById(R.id.playSound);
+
+        context = view.getContext();
+
+        btSoundPlayer = binding.playSound;
 
         fft = new RealDoubleFFT(blockSize);
 
 //        fileNameAudioRecord = requireContext().getFilesDir().getAbsolutePath(); //path
 //        fileNameAudioRecord += "/audiorecord.3gp";
 
-        pathSpikeMaxValue = requireContext().getFilesDir().getAbsolutePath();
+        String pathSpikeMaxValue = context.getFilesDir().getAbsolutePath();
         fileSpike = new File(pathSpikeMaxValue, FILE_NAME_SPIKE);
 
         boolean hasMic = checkMicAvailability();
         mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
-        tvOrientationAngles = view.findViewById(R.id.tvOrientationAngles);
-        tvRotationMatrix = view.findViewById(R.id.tvRotationMatrix);
+        mMagneticFieldSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
-        ivRoom = view.findViewById(R.id.ivRoom);
+        tvOrientationAngles = binding.tvOrientationAngles;
+        tvRotationMatrix = binding.tvRotationMatrix;
+        tvRotationLabel = binding.tvRotationLabel;
+        tvOrientationLabel = binding.tvOrientationLabel;
+
+        ivRoom = binding.ivRoom;
         bmRoom = Bitmap.createBitmap(1500, 1500, Bitmap.Config.ARGB_8888);
         roomCanvas = new Canvas(bmRoom);
 
-        ivGraph = view.findViewById(R.id.ivGraph);
+        ivGraph = binding.ivGraph;
         ivGraph.setScaleY(-1);
         bmGraph = Bitmap.createBitmap(420, 250, Bitmap.Config.ARGB_8888);
         graphCanvas = new Canvas(bmGraph);
@@ -183,10 +221,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         soundGraphView = new SoundGraphView(requireActivity());
         soundGraphView.draw(graphCanvas);
 
+        tvRotationLabel.setText( "Hold telefonen liggende med bunnen mot objekt");
+
         btSoundPlayer.setOnClickListener(view1 -> {
             if (!isRunning) {
                 if (hasMic) {
-                    //ask for recording permissions
                     askForRecordingPermission();
                 } else {
                     Toast.makeText(requireActivity(),
@@ -211,13 +250,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         channelConfiguration, audioEncoding);
                 //Har checkpermission ved trykk av knappen før denne
                 if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                    // TODO: Consider calling
-                    //    ActivityCompat#requestPermissions
-                    // here to request the missing permissions, and then overriding
-                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                    //                                          int[] grantResults)
-                    // to handle the case where the user grants the permission. See the documentation
-                    // for ActivityCompat#requestPermissions for more details.
                     Toast.makeText(requireContext(), "Permission not given.", Toast.LENGTH_SHORT).show();
                 }
                 AudioRecord audioRecord = new AudioRecord(
@@ -246,31 +278,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
                     ArrayList<XYCoordinates> graphCoordinates = new ArrayList<XYCoordinates>();
 
-                    //Se på Logcat Debug og tast inn FFT
-                    //Bruker ToneGenerator.TONE_DTMF_1. Frekvensene havner i to områder, en mellom 40 og 50 og en mellom 70 og 80 (fra 1 - 256)
-                    // -----Jeg har endret litt i (((bmGraph = Bitmap.createBitmap(420, 250, Bitmap.Config.ARGB_8888);))) og den ((new XYCoordinates((float) ((i + 8) * 1.55), (float) toTransform[i] * 10);))
-
-
-                    //Vi kan velge enten den som ligger mellom 40 og 50 eller den som ligger mellom 70 og 80 (arrayene frequency40 og frequency70)
-                    //Høyeste verdi i hvert array er "spikes", da må vi få max verdi i arrayet.
-                    //Gjennomsnittsverdien til maksene gir oss et ca nivå på hvor høyt den verdien skal være i forhold til avstand.
-                    //Gjennomsnittsverdiene kan vi bruke til kalibrering. Da må vi spille i forskjellige avstander fra f.eks en vegg
-                    // -----Høres bra ut
-
-
-                    //Lydvolumet må være KONSTANT og frequency som er sendt til Audiorecord er på 8000
-                    //Tar ikke hensyn på materialet til objektet
-                    //Vi må kanskje lagre maks til arrayene i en fil for å kunne bruke til kalibrering?
-                    // -----Jeg lagrer nå begge max verdiene i en egen fil
-
-                    // Vi må ha kalibreringsverdier for f.eks 0 avstand, 10 cm avstand, osv.... Så interpolerer vi resten?
-                    // Han sa målingen var ikke så nøye, vi prøver så godt vi kan
-
-                    //Ideen har ikke tatt hensyn til andre sensorverdier, men vi kan sammenligne med avstandssensor
-
-
-                    // -----Husker du han sendte oss angående denne: "This file should look something like: date-time:distance:type(filtered,fft,none)"
-                    //har du den fortsatt så kan jeg lagre fft i den andre filen
 
                     /****For lyd dmtf-1*****/
                     ArrayList<Double> frequency40 = new ArrayList<Double>();
@@ -298,21 +305,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     double max70 = Collections.max(frequency70); //spike i 70 området, brukes til kalibrering, lagres med distanseverdi
                     currentFFTSpike = max40;
 
-
                     //Log.d("Spike", currentFFTSpike +"");
                     //double maxCDMI = Collections.max(frequency);
                     soundGraphView.setGraphCoordinates(graphCoordinates);
 
                     saveSpikeMaxInFile(max40, max70);
-
-
-
-
-
                 }
-
                 audioRecord.stop();
-
             } catch (Throwable t) {
                 t.printStackTrace();
                 Log.e("AudioRecord", "Recording Failed");
@@ -429,7 +428,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private void playRecorded() {
         recordedMediaPlayer = new MediaPlayer();
         try {
-            recordedMediaPlayer.setDataSource(fileNameAudioRecord);
+            recordedMediaPlayer.setDataSource(FILE_NAME_AUDIO_RECORD);
             recordedMediaPlayer.prepare();
             recordedMediaPlayer.start();
         } catch (IOException e) {
@@ -451,26 +450,27 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     @Override
     public void onStop() {
         super.onStop();
-
         mSensorManager.unregisterListener(this);
     }
 
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
-        tvOrientationAngles.setText("");
-        if (sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            System.arraycopy(sensorEvent.values, 0, accelerometerReading,
-                    0, accelerometerReading.length);
-        } else if (sensorEvent.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            System.arraycopy(sensorEvent.values, 0, magnetometerReading,
-                    0, magnetometerReading.length);
+        int sensorType = sensorEvent.sensor.getType();
+        switch (sensorType) {
+            case Sensor.TYPE_MAGNETIC_FIELD:
+                System.arraycopy(sensorEvent.values, 0, magnetometerReading,
+                        0, magnetometerReading.length);
+                String sensorResultMagneticFields = String.format("North: %.3f , East: %.3f , Up: %.3f ", sensorEvent.values[0], sensorEvent.values[1], sensorEvent.values[2]);
+                tvRotationMatrix.setText(sensorResultMagneticFields);
+            case Sensor.TYPE_ACCELEROMETER:
+                System.arraycopy(sensorEvent.values, 0, accelerometerReading,
+                        0, accelerometerReading.length);
         }
         updateOrientationAngles();
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
-
     }
 
     public void updateOrientationAngles() {
@@ -478,12 +478,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 accelerometerReading, magnetometerReading);
 
         SensorManager.getOrientation(rotationMatrix, orientationAngles);
+        String sensorOrientationFields = String.format("Azimuth: %.3f , Pitch: %.3f , Roll: %.3f ", orientationAngles[0], orientationAngles[1], orientationAngles[2]);
+        tvOrientationAngles.setText(sensorOrientationFields);
 
         for (int i = 0; i < orientationAngles.length; i++) {
             if (i != 2) {
-                tvOrientationAngles.append(i + ": " + orientationAngles[i] + ", ");
+                //tvOrientationAngles.append(i + ": " + orientationAngles[i] + ", ");
             } else {
-                tvOrientationAngles.append(i + ": " + orientationAngles[i]);
+                //tvOrientationAngles.append(i + ": " + orientationAngles[i]);
             }
         }
     }
@@ -498,17 +500,16 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         drawGraph();
                         timeStep+=1;
                         if(timeStep%20 == 0){
+                            RoomView.updateCircles(magnetometerReading, accelerometerReading);
                             double currentDistance = calculateDistance(currentFFTSpike);
                             Log.d("Current pos", currentDistance + "");
                             roomView.setZ_value((float) currentDistance);
                             roomCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
                             roomView.draw(roomCanvas);
                             ivRoom.setImageBitmap(bmRoom);
+                            updateDistanceText(currentDistance);
                         }
-
-
-                            //updateDistanceText(currentDistance);
-
+                        //updateDistanceText(currentDistance);
                         //Log.d("bufferReadResult, Before toTransform:", String.valueOf(beforeFFT));
                         //Log.d("bufferReadResult, After toTransform:", String.valueOf(afterFFT));
                     }
@@ -522,7 +523,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     }
 
     private void updateDistanceText(double distance) {
-        tvRotationMatrix.setText(distance + "");
+        tvOrientationLabel.setText( "Current disance: " + distance);
     }
 
     public void drawGraph() {

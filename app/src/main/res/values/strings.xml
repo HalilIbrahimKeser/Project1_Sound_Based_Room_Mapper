@@ -3,8 +3,8 @@
 
     <string name="play">Play</string>
     <string name="_0_0_0">0, 0, 0</string>
-    <string name="rotation_matrix">Rotation Matrix:</string>
+    <string name="rotation_matrix">Information:</string>
     <string name="room">Room</string>
     <string name="graph">Graph</string>
-    <string name="orientation_angles">Orientation Angles:</string>
+    <string name="orientation_angles">Distanse:</string>
 </resources>
