@@ -5,6 +5,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import androidx.annotation.Nullable;
@@ -15,8 +16,9 @@ public class RoomView extends View {
 
 
     private Paint paintCircle, paintBox, paintPerson;
-    //private Path pathBoundary;
 
+    private static float[] updatedMagnetometerReading;
+    private static float[] updatedAccelerometerReading;
 
     private ArrayList<XYCoordinates> objectCoordinates;
 
@@ -40,6 +42,12 @@ public class RoomView extends View {
         init();
     }
 
+    public static void updateCircles(float[] magnetometerReading, float[] accelerometerReading) {
+        updatedMagnetometerReading = magnetometerReading;
+        updatedAccelerometerReading = accelerometerReading;
+    }
+
+
     public void init(){
         paintCircle = new Paint();
         paintPerson = new Paint();
@@ -53,6 +61,7 @@ public class RoomView extends View {
         paintBox.setColor(Color.GRAY);
         paintBox.setStyle(Paint.Style.STROKE);
         paintBox.setStrokeWidth(5);
+        z_value = 100;
 
     }
 
@@ -61,17 +70,44 @@ public class RoomView extends View {
         super.draw(canvas);
         //TODO
         float my_x_pos = canvas.getWidth()/2;
-        float my_z_pos = canvas.getHeight()/2;
+        float my_z_pos = canvas.getHeight()-300;
         x_value = my_x_pos;
 
         if (started){
 
-            canvas.drawCircle(x_value, x_value + (z_value*20), 70, paintCircle);
+            canvas.drawCircle(x_value, my_z_pos - (z_value*20), 100, paintCircle);
         }
-        canvas.drawCircle(my_x_pos, my_z_pos, 40, paintPerson);
+        canvas.drawCircle(my_x_pos, my_z_pos, 70, paintPerson);
 
         canvas.drawRect(20, 100, canvas.getWidth()-30, canvas.getHeight()-100, paintBox);
 
+    }
+
+    public String getDirection(){
+        if(updatedMagnetometerReading != null && updatedAccelerometerReading != null) {
+            // Peker nord,
+            // Magnet 0:Nord, Magnet 1:East, Magnet 2:Up
+            if (updatedMagnetometerReading[0] > (-20) && updatedMagnetometerReading[0] < 20 && updatedMagnetometerReading[1] >= 15) {
+                Log.d("PEKER", "Nord");
+                return "North";
+            } // Peker sør
+            else if (updatedMagnetometerReading[0] > (-20) && updatedMagnetometerReading[0] < 20 && updatedMagnetometerReading[1] <= (-15)) {
+                Log.d("PEKER", "Sør");
+                return "South";
+            } // Peker øst
+            else if (updatedMagnetometerReading[0] < (-17) && updatedMagnetometerReading[1] > (-15) && updatedMagnetometerReading[1] < 15) {
+                Log.d("PEKER", "Øst");
+                return "East";
+            }// Peker vest
+            else if (updatedMagnetometerReading[0] > 17 && updatedMagnetometerReading[1] > (-15) && updatedMagnetometerReading[1] < 15) {
+                Log.d("PEKER", "Vest");
+                return "West";
+            } else{
+                return "Direction";
+            }
+        } else{
+            return "Direction is not yet ready";
+        }
     }
 
     public float getX_value() {

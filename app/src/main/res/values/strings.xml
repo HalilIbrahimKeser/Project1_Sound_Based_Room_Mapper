@@ -6,5 +6,5 @@
     <string name="distance">Distance:</string>
     <string name="room">Room</string>
     <string name="graph">Graph</string>
-    <string name="orientation_angles">Orientation Angles:</string>
+    <string name="magnetic_field">Magnetic Field:</string>
 </resources>

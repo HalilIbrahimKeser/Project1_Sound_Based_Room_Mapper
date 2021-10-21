@@ -60,10 +60,15 @@ import java.util.TimerTask;
 public class SoundBasedMapperFragment extends Fragment implements SensorEventListener {
 
     private SensorManager mSensorManager;
+    private Sensor mMagneticFieldSensor;
+    private Sensor mAccelerometerSensor;
     private final float[] accelerometerReading = new float[3];
     private final float[] magnetometerReading = new float[3];
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
+
+    float[] mGravity;
+    float[] mGeomagnetic;
 
     private Sensor accelerometer;
     private Sensor magneticField;
@@ -71,6 +76,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private Canvas roomCanvas;
     private TextView tvDistance;
     private TextView tvOrientationAngles;
+    private TextView tvDirection;
     private ImageView ivRoom;
     private ImageView ivGraph;
 
@@ -156,6 +162,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
         tvOrientationAngles = view.findViewById(R.id.tvOrientationAngles);
         tvDistance = view.findViewById(R.id.tvDistance);
+        tvDirection = view.findViewById(R.id.tvDirection);
 
         ivRoom = view.findViewById(R.id.ivRoom);
         bmRoom = Bitmap.createBitmap(1500, 1500, Bitmap.Config.ARGB_8888);
@@ -228,40 +235,8 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     }
                     fft.ft(toTransform);
                     publishProgress(toTransform);
-
                     ArrayList<XYCoordinates> graphCoordinates = new ArrayList<XYCoordinates>();
-
-                    //Se på Logcat Debug og tast inn FFT
-                    //Bruker ToneGenerator.TONE_DTMF_1. Frekvensene havner i to områder, en mellom 40 og 50 og en mellom 70 og 80 (fra 1 - 256)
-                    // -----Jeg har endret litt i (((bmGraph = Bitmap.createBitmap(420, 250, Bitmap.Config.ARGB_8888);))) og den ((new XYCoordinates((float) ((i + 8) * 1.55), (float) toTransform[i] * 10);))
-
-
-                    //Vi kan velge enten den som ligger mellom 40 og 50 eller den som ligger mellom 70 og 80 (arrayene frequency40 og frequency70)
-                    //Høyeste verdi i hvert array er "spikes", da må vi få max verdi i arrayet.
-                    //Gjennomsnittsverdien til maksene gir oss et ca nivå på hvor høyt den verdien skal være i forhold til avstand.
-                    //Gjennomsnittsverdiene kan vi bruke til kalibrering. Da må vi spille i forskjellige avstander fra f.eks en vegg
-                    // -----Høres bra ut
-
-
-                    //Lydvolumet må være KONSTANT og frequency som er sendt til Audiorecord er på 8000
-                    //Tar ikke hensyn på materialet til objektet
-                    //Vi må kanskje lagre maks til arrayene i en fil for å kunne bruke til kalibrering?
-                    // -----Jeg lagrer nå begge max verdiene i en egen fil
-
-                    // Vi må ha kalibreringsverdier for f.eks 0 avstand, 10 cm avstand, osv.... Så interpolerer vi resten?
-                    // Han sa målingen var ikke så nøye, vi prøver så godt vi kan
-
-                    //Ideen har ikke tatt hensyn til andre sensorverdier, men vi kan sammenligne med avstandssensor
-
-
-                    // -----Husker du han sendte oss angående denne: "This file should look something like: date-time:distance:type(filtered,fft,none)"
-                    //har du den fortsatt så kan jeg lagre fft i den andre filen
-
-
                     ArrayList<Double> frequency40 = new ArrayList<Double>();
-
-
-
                     for (int i = 0; i < toTransform.length; i++) {
                         XYCoordinates coordinate = new XYCoordinates((float) ((i + 8) * 1.55), (float) (toTransform[i] * 10) + 125);
                         if (i > 39 && i < 51) {
@@ -283,7 +258,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         }
                         currentFFTSpike = total/30;
                     }
-
                     soundGraphView.setGraphCoordinates(graphCoordinates);
                 }
 
@@ -401,15 +375,18 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
-        tvOrientationAngles.setText("");
-        if (sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            System.arraycopy(sensorEvent.values, 0, accelerometerReading,
-                    0, accelerometerReading.length);
-        } else if (sensorEvent.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            System.arraycopy(sensorEvent.values, 0, magnetometerReading,
-                    0, magnetometerReading.length);
+        int sensorType = sensorEvent.sensor.getType();
+        switch (sensorType) {
+            case Sensor.TYPE_MAGNETIC_FIELD:
+                System.arraycopy(sensorEvent.values, 0, magnetometerReading,
+                        0, magnetometerReading.length);
+                String sensorResultMagneticFields = String.format("North: %.3f , East: %.3f , Up: %.3f ", sensorEvent.values[0], sensorEvent.values[1], sensorEvent.values[2]);
+                tvOrientationAngles.setText(sensorResultMagneticFields);
+            case Sensor.TYPE_ACCELEROMETER:
+                System.arraycopy(sensorEvent.values, 0, accelerometerReading,
+                        0, accelerometerReading.length);
         }
-        updateOrientationAngles();
+        //updateOrientationAngles();
     }
 
     @Override
@@ -417,11 +394,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
     }
 
-    public void updateOrientationAngles() {
+    /*public void updateOrientationAngles() {
         SensorManager.getRotationMatrix(rotationMatrix, null,
                 accelerometerReading, magnetometerReading);
 
         SensorManager.getOrientation(rotationMatrix, orientationAngles);
+        String sensorOrientationFields = String.format("Azimuth: %.3f , Pitch: %.3f , Roll: %.3f ", orientationAngles[0], orientationAngles[1], orientationAngles[2]);
+        tvOrientationAngles.setText(sensorOrientationFields);
+
 
         for (int i = 0; i < orientationAngles.length; i++) {
             if (i != 2) {
@@ -430,7 +410,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 tvOrientationAngles.append(i + ": " + orientationAngles[i]);
             }
         }
-    }
+    }*/
 
     public void startDrawing() {
         if (timer == null) {
@@ -442,12 +422,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         drawGraph();
                         timeStep+=1;
                         if(timeStep%20 == 0){
+                            RoomView.updateCircles(magnetometerReading, accelerometerReading);
                             currentDistance = calculateDistance(currentFFTSpike);
                             saveDistance(currentDistance);
                             handler.post(new Runnable() {
                                 @Override
                                 public void run() {
                                    updateDistanceText(currentDistance);
+                                   tvDirection.setText(roomView.getDirection());
                                 }
                             });
                             Log.d("Current pos", currentDistance + "");
