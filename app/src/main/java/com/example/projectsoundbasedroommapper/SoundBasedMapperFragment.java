@@ -54,6 +54,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -62,8 +63,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private SensorManager mSensorManager;
     private Sensor mMagneticFieldSensor;
     private Sensor mAccelerometerSensor;
+    private Sensor mProximitySensor;
     private final float[] accelerometerReading = new float[3];
     private final float[] magnetometerReading = new float[3];
+    private final float[] proximityReading = new float[1];
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
 
@@ -72,6 +75,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
     private Sensor accelerometer;
     private Sensor magneticField;
+    private Sensor proximity;
 
     private Canvas roomCanvas;
     private TextView tvDistance;
@@ -145,6 +149,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         if (magneticField != null) {
             mSensorManager.registerListener(this, magneticField, mSensorManager.SENSOR_DELAY_NORMAL);
         }
+        proximity = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
+        if (proximity != null) {
+            mSensorManager.registerListener(this, proximity, mSensorManager.SENSOR_DELAY_NORMAL);
+        }
     }
 
     @Override
@@ -159,7 +167,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         fileSpike = new File(pathSpikeMaxValue, FILE_NAME_SPIKE);
 
         boolean hasMic = checkMicAvailability();
-        mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
+        mSensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
         tvOrientationAngles = view.findViewById(R.id.tvOrientationAngles);
         tvDistance = view.findViewById(R.id.tvDistance);
         tvDirection = view.findViewById(R.id.tvDirection);
@@ -206,7 +214,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
             try {
                 if (fftAverageHolder == null){
-                    fftAverageHolder = new ArrayList<Double>();
+                    fftAverageHolder = new ArrayList<>();
                 }
                 int bufferSize = AudioRecord.getMinBufferSize(frequency,
                         channelConfiguration, audioEncoding);
@@ -270,9 +278,11 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             return null;
         }
     }
+
     private void saveDistance(double distance) {
         try {
             streamSpike = new FileWriter(fileSpike, true); //false for å slette gamle verdier i filen
+            @SuppressLint("SimpleDateFormat")
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             Date date = new Date(System.currentTimeMillis());
             String now = dateFormat.format(date);
@@ -312,7 +322,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     }
 
     //Source: https://developer.android.com/training/permissions/requesting#java
-    private ActivityResultLauncher<String> requestPermissionLauncher =
+    private final ActivityResultLauncher<String> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
                 if (isGranted) {
                     startProgram();
@@ -369,7 +379,6 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     @Override
     public void onStop() {
         super.onStop();
-
         mSensorManager.unregisterListener(this);
     }
 
@@ -380,11 +389,17 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
             case Sensor.TYPE_MAGNETIC_FIELD:
                 System.arraycopy(sensorEvent.values, 0, magnetometerReading,
                         0, magnetometerReading.length);
-                String sensorResultMagneticFields = String.format("North: %.3f , East: %.3f , Up: %.3f ", sensorEvent.values[0], sensorEvent.values[1], sensorEvent.values[2]);
+                @SuppressLint("DefaultLocale")
+                String sensorResultMagneticFields = String.format("North: %.3f , East: %.3f , Up: %.3f ", magnetometerReading[0], magnetometerReading[1], magnetometerReading[2]);
                 tvOrientationAngles.setText(sensorResultMagneticFields);
             case Sensor.TYPE_ACCELEROMETER:
                 System.arraycopy(sensorEvent.values, 0, accelerometerReading,
                         0, accelerometerReading.length);
+            case Sensor.TYPE_PROXIMITY:
+                if (sensorEvent.values[0] != 0.0f) {
+                    proximityReading[0] = sensorEvent.values[0];
+                }
+
         }
         //updateOrientationAngles();
     }
@@ -422,7 +437,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         drawGraph();
                         timeStep+=1;
                         if(timeStep%20 == 0){
-                            RoomView.updateCircles(magnetometerReading, accelerometerReading);
+                            RoomView.updateCircles(magnetometerReading, accelerometerReading, proximityReading);
                             currentDistance = calculateDistance(currentFFTSpike);
                             saveDistance(currentDistance);
                             handler.post(new Runnable() {
@@ -455,16 +470,13 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         ivRoom.setImageBitmap(bmRoom);
     }
 
+    @SuppressLint("SetTextI18n")
     private void updateDistanceText(double distance) {
         tvDistance.setText(distance + "");
     }
 
     public void drawGraph() {
-        if (currentDistance < 0.5){
-            soundGraphView.setClose(true);
-        } else{
-            soundGraphView.setClose(false);
-        }
+        soundGraphView.setClose(currentDistance < 0.5);
         graphCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.MULTIPLY);
         soundGraphView.draw(graphCanvas);
         ivGraph.setImageBitmap(bmGraph);

@@ -17,15 +17,16 @@ public class RoomView extends View {
 
     private Paint paintCircle, paintBox, paintPerson;
 
-    private static float[] updatedMagnetometerReading;
-    private static float[] updatedAccelerometerReading;
+    private static float[] magnetometerReadingUpdated;
+    private static float[] accelerometerReadingUpdated;
+    private static float[] proximityReadingUpdated;
 
     private ArrayList<XYCoordinates> objectCoordinates;
+
 
     private boolean started = false;
     private float x_value;
     private float z_value;
-
 
     public RoomView(Context context) {
         super(context);
@@ -42,9 +43,10 @@ public class RoomView extends View {
         init();
     }
 
-    public static void updateCircles(float[] magnetometerReading, float[] accelerometerReading) {
-        updatedMagnetometerReading = magnetometerReading;
-        updatedAccelerometerReading = accelerometerReading;
+    public static void updateCircles(float[] magnetometerReading, float[] accelerometerReading, float[] proximityReading) {
+        magnetometerReadingUpdated = magnetometerReading;
+        accelerometerReadingUpdated = accelerometerReading;
+        proximityReadingUpdated = proximityReading;
     }
 
 
@@ -84,22 +86,27 @@ public class RoomView extends View {
     }
 
     public String getDirection(){
-        if(updatedMagnetometerReading != null && updatedAccelerometerReading != null) {
+        if(magnetometerReadingUpdated != null && accelerometerReadingUpdated != null && proximityReadingUpdated != null) {
+            //Avstand fra proximity
+            if (proximityReadingUpdated[0] != 0.0f){
+                Log.d("proximityReadingUpdated", proximityReadingUpdated[0] + " cm");
+            }
+
             // Peker nord,
             // Magnet 0:Nord, Magnet 1:East, Magnet 2:Up
-            if (updatedMagnetometerReading[0] > (-20) && updatedMagnetometerReading[0] < 20 && updatedMagnetometerReading[1] >= 15) {
+            if (magnetometerReadingUpdated[0] > (-20) && magnetometerReadingUpdated[0] < 20 && magnetometerReadingUpdated[1] >= 15) {
                 Log.d("PEKER", "Nord");
                 return "North";
             } // Peker sør
-            else if (updatedMagnetometerReading[0] > (-20) && updatedMagnetometerReading[0] < 20 && updatedMagnetometerReading[1] <= (-15)) {
+            else if (magnetometerReadingUpdated[0] > (-20) && magnetometerReadingUpdated[0] < 20 && magnetometerReadingUpdated[1] <= (-15)) {
                 Log.d("PEKER", "Sør");
                 return "South";
             } // Peker øst
-            else if (updatedMagnetometerReading[0] < (-17) && updatedMagnetometerReading[1] > (-15) && updatedMagnetometerReading[1] < 15) {
+            else if (magnetometerReadingUpdated[0] < (-17) && magnetometerReadingUpdated[1] > (-15) && magnetometerReadingUpdated[1] < 15) {
                 Log.d("PEKER", "Øst");
                 return "East";
             }// Peker vest
-            else if (updatedMagnetometerReading[0] > 17 && updatedMagnetometerReading[1] > (-15) && updatedMagnetometerReading[1] < 15) {
+            else if (magnetometerReadingUpdated[0] > 17 && magnetometerReadingUpdated[1] > (-15) && magnetometerReadingUpdated[1] < 15) {
                 Log.d("PEKER", "Vest");
                 return "West";
             } else{
