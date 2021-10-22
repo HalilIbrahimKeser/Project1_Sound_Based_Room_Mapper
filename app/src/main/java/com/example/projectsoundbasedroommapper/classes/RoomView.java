@@ -23,7 +23,6 @@ public class RoomView extends View {
 
     private ArrayList<XYCoordinates> objectCoordinates;
 
-
     private boolean started = false;
     private float x_value;
     private float z_value;
@@ -49,7 +48,6 @@ public class RoomView extends View {
         proximityReadingUpdated = proximityReading;
     }
 
-
     public void init(){
         paintCircle = new Paint();
         paintPerson = new Paint();
@@ -64,23 +62,20 @@ public class RoomView extends View {
         paintBox.setStyle(Paint.Style.STROKE);
         paintBox.setStrokeWidth(5);
         z_value = 100;
-
     }
 
     @Override
     public void draw(Canvas canvas) {
         super.draw(canvas);
-        //TODO
         float my_x_pos = canvas.getWidth()/2;
         float my_z_pos = canvas.getHeight()-300;
         x_value = my_x_pos;
 
         if (started){
 
-            canvas.drawCircle(x_value, my_z_pos - (z_value*20), 100, paintCircle);
+            canvas.drawCircle(x_value, my_z_pos - (z_value * 50), 100, paintCircle);
         }
         canvas.drawCircle(my_x_pos, my_z_pos, 70, paintPerson);
-
         canvas.drawRect(20, 100, canvas.getWidth()-30, canvas.getHeight()-100, paintBox);
 
     }
