@@ -2,7 +2,8 @@
     <string name="app_name">Project Sound Based Room Mapper</string>
 
     <string name="play">Play</string>
-    <string name="_0_0_0">0, 0, 0</string>
+    <string name="zerovalues">0, 0, 0</string>
+    <string name="notmeasured">0.0 cm</string>
     <string name="distance">Distance:</string>
     <string name="room">Room</string>
     <string name="graph">Graph</string>

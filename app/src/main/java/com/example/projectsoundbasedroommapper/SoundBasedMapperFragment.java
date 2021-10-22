@@ -20,15 +20,6 @@ import android.media.MediaRecorder;
 import android.media.ToneGenerator;
 import android.os.AsyncTask;
 import android.os.Bundle;
-
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.fragment.app.Fragment;
-
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -39,6 +30,14 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
 
 import com.example.projectsoundbasedroommapper.classes.RoomView;
 import com.example.projectsoundbasedroommapper.classes.SoundGraphView;
@@ -54,32 +53,21 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class SoundBasedMapperFragment extends Fragment implements SensorEventListener {
 
     private SensorManager mSensorManager;
-    private Sensor mMagneticFieldSensor;
-    private Sensor mAccelerometerSensor;
-    private Sensor mProximitySensor;
+
     private final float[] accelerometerReading = new float[3];
     private final float[] magnetometerReading = new float[3];
     private final float[] proximityReading = new float[1];
-    private final float[] rotationMatrix = new float[9];
-    private final float[] orientationAngles = new float[3];
-
-    float[] mGravity;
-    float[] mGeomagnetic;
-
-    private Sensor accelerometer;
-    private Sensor magneticField;
-    private Sensor proximity;
 
     private Canvas roomCanvas;
     private TextView tvDistance;
-    private TextView tvOrientationAngles;
+    private TextView tvMagneticFieldAngles;
+    private TextView tvDistanceLightProximity;
     private TextView tvDirection;
     private ImageView ivRoom;
     private ImageView ivGraph;
@@ -98,14 +86,14 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     private SoundGraphView soundGraphView;
     private MediaPlayer recordedMediaPlayer;
     private ToneGenerator tone;
-    private int blockSize = 256; //for fft
+    private final int blockSize = 256; //for fft
 
     File fileSpike;
     FileWriter streamSpike;
-    private static String pathSpikeMaxValue = null;
     private static final String FILE_NAME_SPIKE = "fileNameSpikeMaxValue.txt";
 
-    private RealDoubleFFT fft; //Class Source: https://github.com/bewantbe/audio-analyzer-for-android
+    //Source: https://stackoverflow.com/questions/5511250/capturing-sound-for-analysis-and-visualizing-frequencies-in-android
+    private RealDoubleFFT fft;
     int frequency = 8000;
     int channelConfiguration = AudioFormat.CHANNEL_IN_MONO;
     int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
@@ -118,8 +106,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     }
 
     public static SoundBasedMapperFragment newInstance() {
-        SoundBasedMapperFragment fragment = new SoundBasedMapperFragment();
-        return fragment;
+        return new SoundBasedMapperFragment();
     }
 
     @Override
@@ -141,34 +128,36 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     @Override
     public void onResume() {
         super.onResume();
-        accelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        Sensor accelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         if (accelerometer != null) {
-            mSensorManager.registerListener(this, accelerometer, mSensorManager.SENSOR_DELAY_NORMAL);
+            mSensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         }
-        magneticField = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        Sensor magneticField = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         if (magneticField != null) {
-            mSensorManager.registerListener(this, magneticField, mSensorManager.SENSOR_DELAY_NORMAL);
+            mSensorManager.registerListener(this, magneticField, SensorManager.SENSOR_DELAY_NORMAL);
         }
-        proximity = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
+        Sensor proximity = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
         if (proximity != null) {
-            mSensorManager.registerListener(this, proximity, mSensorManager.SENSOR_DELAY_NORMAL);
+            mSensorManager.registerListener(this, proximity, SensorManager.SENSOR_DELAY_NORMAL);
         }
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+
         super.onViewCreated(view, savedInstanceState);
         handler = new Handler(Looper.getMainLooper());
         btSoundPlayer = view.findViewById(R.id.playSound);
 
         fft = new RealDoubleFFT(blockSize);
 
-        pathSpikeMaxValue = requireContext().getFilesDir().getAbsolutePath();
+        String pathSpikeMaxValue = requireContext().getFilesDir().getAbsolutePath();
         fileSpike = new File(pathSpikeMaxValue, FILE_NAME_SPIKE);
 
         boolean hasMic = checkMicAvailability();
         mSensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
-        tvOrientationAngles = view.findViewById(R.id.tvOrientationAngles);
+        tvMagneticFieldAngles = view.findViewById(R.id.tvMagneticFieldAngles);
+        tvDistanceLightProximity = view.findViewById(R.id.tvDistanceLightProximity);
         tvDistance = view.findViewById(R.id.tvDistance);
         tvDirection = view.findViewById(R.id.tvDirection);
 
@@ -207,8 +196,8 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     }
 
     @SuppressLint("StaticFieldLeak")
-    //Source: https://stackoverflow.com/questions/5511250/capturing-sound-for-analysis-and-visualizing-frequencies-in-android
     private class RecordAudio extends AsyncTask<Void, double[], Void> {
+        //Source: https://stackoverflow.com/questions/5511250/capturing-sound-for-analysis-and-visualizing-frequencies-in-android
         @Override
         protected Void doInBackground(Void... arg0) {
 
@@ -250,12 +239,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                         if (i > 39 && i < 51) {
                             frequency40.add(toTransform[i]*100);
                         }
-                        /*if (i > 69 && i < 81) {
-                            frequency70.add(toTransform[i]*100);
-                        }*/
                         graphCoordinates.add(coordinate);
-
-                        //Log.d("FFT value" + i + ": ", String.valueOf(toTransform[i] * 100));
                     }
                     double max40 = Collections.max(frequency40); //spike i 40 området, brukes til kalibrering, lagres med distanseverdi
                     fftAverageHolder.add(max40);
@@ -268,9 +252,7 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                     }
                     soundGraphView.setGraphCoordinates(graphCoordinates);
                 }
-
                 audioRecord.stop();
-
             } catch (Throwable t) {
                 t.printStackTrace();
                 Log.e("AudioRecord", "Recording Failed");
@@ -300,12 +282,8 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
     }
 
     public boolean checkMicAvailability() {
-        if (requireActivity().getApplicationContext().getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_MICROPHONE)) {
-            return true;
-        } else {
-            return false;
-        }
+        return requireActivity().getApplicationContext().getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_MICROPHONE);
     }
 
     //Source: https://developer.android.com/training/permissions/requesting#java
@@ -390,8 +368,8 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 System.arraycopy(sensorEvent.values, 0, magnetometerReading,
                         0, magnetometerReading.length);
                 @SuppressLint("DefaultLocale")
-                String sensorResultMagneticFields = String.format("North: %.3f , East: %.3f , Up: %.3f ", magnetometerReading[0], magnetometerReading[1], magnetometerReading[2]);
-                tvOrientationAngles.setText(sensorResultMagneticFields);
+                String sensorResultMagneticFields = String.format("Magnetic Field: North: %.2f , East: %.2f , Up: %.2f ", magnetometerReading[0], magnetometerReading[1], magnetometerReading[2]);
+                tvMagneticFieldAngles.setText(sensorResultMagneticFields);
             case Sensor.TYPE_ACCELEROMETER:
                 System.arraycopy(sensorEvent.values, 0, accelerometerReading,
                         0, accelerometerReading.length);
@@ -399,33 +377,12 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
                 if (sensorEvent.values[0] != 0.0f) {
                     proximityReading[0] = sensorEvent.values[0];
                 }
-
         }
-        //updateOrientationAngles();
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
-
     }
-
-    /*public void updateOrientationAngles() {
-        SensorManager.getRotationMatrix(rotationMatrix, null,
-                accelerometerReading, magnetometerReading);
-
-        SensorManager.getOrientation(rotationMatrix, orientationAngles);
-        String sensorOrientationFields = String.format("Azimuth: %.3f , Pitch: %.3f , Roll: %.3f ", orientationAngles[0], orientationAngles[1], orientationAngles[2]);
-        tvOrientationAngles.setText(sensorOrientationFields);
-
-
-        for (int i = 0; i < orientationAngles.length; i++) {
-            if (i != 2) {
-                tvOrientationAngles.append(i + ": " + orientationAngles[i] + ", ");
-            } else {
-                tvOrientationAngles.append(i + ": " + orientationAngles[i]);
-            }
-        }
-    }*/
 
     public void startDrawing() {
         if (timer == null) {
@@ -472,7 +429,10 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
 
     @SuppressLint("SetTextI18n")
     private void updateDistanceText(double distance) {
-        tvDistance.setText(distance + "");
+        String stringDistanceSound = String.format("Sound distance: %.3f cm", distance);
+        String stringDistanceLight = String.format("Light distance: %.3f cm", proximityReading[0]);
+        tvDistanceLightProximity.setText(stringDistanceSound);
+        tvDistance.setText(stringDistanceLight);
     }
 
     public void drawGraph() {
@@ -482,8 +442,9 @@ public class SoundBasedMapperFragment extends Fragment implements SensorEventLis
         ivGraph.setImageBitmap(bmGraph);
     }
 
-    //hardcoded based on calibration curve that is made with a trendline in Excel
     private double calculateDistance(double fft ){
+        //hardcoded based on calibration curve that is made with a trendline in Excel
+
         //based on frequency in area 40, power equation based on calibration values
         //x = 0.0007y^2 - 0.0601y + 12.151
         //get x = distance

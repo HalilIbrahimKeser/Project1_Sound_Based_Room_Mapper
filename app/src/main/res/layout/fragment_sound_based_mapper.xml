@@ -18,7 +18,7 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="vertical">
 
                 <LinearLayout
@@ -26,24 +26,23 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:weightSum="4">
+
                     <LinearLayout
-                        android:layout_width="fill_parent"
+                        android:layout_width="389dp"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_weight="1">
-                        <TextView
-                            android:id="@+id/tvRotationLabel"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/distance"
-                            android:textSize="14sp" />
+                        android:layout_marginStart="5dp"
+                        android:layout_marginEnd="5dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
                         <TextView
                             android:id="@+id/tvDistance"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:paddingStart="5dp"
                             android:paddingEnd="5dp"
+                            android:text="@string/notmeasured"
+                            android:textColor="#6D4C41"
                             android:textSize="16sp" />
                     </LinearLayout>
                     <TextView
@@ -58,20 +57,28 @@
 
 
                 <TextView
-                    android:id="@+id/tvMagneticFieldLabel"
+                    android:id="@+id/tvDistanceLightProximity"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/magnetic_field"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/tvOrientationAngles"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
                     android:paddingStart="5dp"
                     android:paddingEnd="5dp"
-                    android:text="@string/_0_0_0"
+                    android:text="@string/notmeasured"
+                    android:textColor="#6D4C41"
                     android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/tvMagneticFieldAngles"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="5dp"
+                    android:text="@string/zerovalues"
+                    android:textColor="#6D4C41"
+                    android:textSize="14sp" />
             </LinearLayout>
 
 
